@@ -1,15 +1,9 @@
-// src/lib/team/store.ts - Zustand store for reviewer identity, team, and settings.
-//
-// Inside an open review, profile/team data is stored on review.protocol.team so
-// each review can have its own team and PROSPERO draft attribution. On the
-// welcome screen, the same API still falls back to the app-wide /api/team
-// defaults.
+// src/lib/team/store.ts - reviewer identity, team, and settings.
 
 "use client";
 
 import { create } from "zustand";
 import { newId } from "@/lib/project/id";
-import { useReviewStore } from "@/lib/project/state";
 
 export interface TeamMember {
   id: string;
@@ -27,13 +21,7 @@ export interface TeamMember {
   updatedAt: string;
 }
 
-export type TeamRole =
-  | "lead_reviewer"
-  | "reviewer"
-  | "methodologist"
-  | "statistician"
-  | "librarian"
-  | "consumer";
+export type TeamRole = "lead_reviewer" | "reviewer" | "methodologist" | "statistician" | "librarian" | "consumer";
 
 export const TEAM_ROLES: { value: TeamRole; label: string; description: string }[] = [
   { value: "lead_reviewer", label: "Lead reviewer", description: "Owns the review, makes final calls on disputes." },
@@ -44,16 +32,7 @@ export const TEAM_ROLES: { value: TeamRole; label: string; description: string }
   { value: "consumer", label: "Consumer", description: "Patient / public representative. Reviews plain-language summary." },
 ];
 
-export const TEAM_COLORS = [
-  "#14b8a6", // teal
-  "#6366f1", // indigo
-  "#f59e0b", // amber
-  "#ec4899", // pink
-  "#84cc16", // lime
-  "#3b82f6", // blue
-  "#a855f7", // purple
-  "#f97316", // orange
-];
+export const TEAM_COLORS = ["#14b8a6", "#6366f1", "#f59e0b", "#ec4899", "#84cc16", "#3b82f6", "#a855f7", "#f97316"];
 
 export interface UserProfile {
   density: "compact" | "default" | "dense";
@@ -85,16 +64,24 @@ export const DEFAULT_PROFILE: UserProfile = {
   maxRecentFiles: 20,
 };
 
+interface ReviewScope {
+  members: TeamMember[];
+  saveMembers: (members: TeamMember[]) => void;
+  saveProfile: (profile: UserProfile) => void;
+}
+
 interface TeamState {
   members: TeamMember[];
   currentMember: TeamMember | null;
   profile: UserProfile;
   loading: boolean;
+  reviewScope: ReviewScope | null;
 
   setMembers: (members: TeamMember[]) => void;
   setCurrentMember: (m: TeamMember | null) => void;
   setProfile: (p: UserProfile) => void;
   setLoading: (b: boolean) => void;
+  setReviewScope: (scope: ReviewScope | null) => void;
 
   addMember: (input: Omit<TeamMember, "id" | "createdAt" | "updatedAt">) => Promise<TeamMember | null>;
   updateMember: (id: string, patch: Partial<TeamMember>) => Promise<boolean>;
@@ -114,18 +101,8 @@ function initialsFromName(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function activeReviewMembers(): TeamMember[] | null {
-  const review = useReviewStore.getState().review;
-  if (!review) return null;
-  return review.protocol?.team?.members ?? [];
-}
-
-function writeReviewMembers(members: TeamMember[]): void {
-  useReviewStore.getState().setProtocolTeamMembers(members);
-}
-
-function writeReviewProfile(profile: UserProfile): void {
-  useReviewStore.getState().setProtocolTeamProfile(profile);
+function currentFrom(members: TeamMember[]): TeamMember | null {
+  return members.find((m) => m.isCurrentUser) ?? null;
 }
 
 function localMember(input: Omit<TeamMember, "id" | "createdAt" | "updatedAt">): TeamMember {
@@ -145,10 +122,6 @@ function localMember(input: Omit<TeamMember, "id" | "createdAt" | "updatedAt">):
     createdAt: now,
     updatedAt: now,
   };
-}
-
-function currentFrom(members: TeamMember[]): TeamMember | null {
-  return members.find((m) => m.isCurrentUser) ?? null;
 }
 
 function dbMemberPayload(input: Omit<TeamMember, "id" | "createdAt" | "updatedAt">) {
@@ -178,38 +151,29 @@ export const useTeamStore = create<TeamState>((set, get) => ({
   currentMember: null,
   profile: DEFAULT_PROFILE,
   loading: true,
+  reviewScope: null,
 
-  setMembers: (members) => {
-    set({ members, currentMember: currentFrom(members) });
-  },
+  setMembers: (members) => set({ members, currentMember: currentFrom(members) }),
   setCurrentMember: (m) => set({ currentMember: m }),
   setProfile: (p) => set({ profile: p }),
   setLoading: (b) => set({ loading: b }),
+  setReviewScope: (scope) => set({ reviewScope: scope }),
 
   addMember: async (input) => {
-    const scoped = activeReviewMembers();
-    if (scoped) {
+    const scope = get().reviewScope;
+    if (scope) {
       const member = localMember(input);
-      const members = member.isCurrentUser
-        ? [member, ...scoped.map((m) => ({ ...m, isCurrentUser: false, updatedAt: member.updatedAt }))]
-        : [...scoped, member];
-      writeReviewMembers(members);
-      set({ members, currentMember: currentFrom(members), loading: false });
+      const members = member.isCurrentUser ? [member, ...scope.members.map((m) => ({ ...m, isCurrentUser: false, updatedAt: member.updatedAt }))] : [...scope.members, member];
+      scope.saveMembers(members);
+      set({ members, currentMember: currentFrom(members), reviewScope: { ...scope, members }, loading: false });
       return member;
     }
-
     try {
-      const res = await fetch("/api/team", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dbMemberPayload(input)),
-      });
+      const res = await fetch("/api/team", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(dbMemberPayload(input)) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { member: TeamMember };
       set((s) => {
-        const members = input.isCurrentUser
-          ? [data.member, ...s.members.map((m) => ({ ...m, isCurrentUser: false }))]
-          : [...s.members, data.member];
+        const members = input.isCurrentUser ? [data.member, ...s.members.map((m) => ({ ...m, isCurrentUser: false }))] : [...s.members, data.member];
         return { members, currentMember: currentFrom(members) };
       });
       return data.member;
@@ -220,32 +184,19 @@ export const useTeamStore = create<TeamState>((set, get) => ({
   },
 
   updateMember: async (id, patch) => {
-    const scoped = activeReviewMembers();
-    if (scoped) {
+    const scope = get().reviewScope;
+    if (scope) {
       const now = new Date().toISOString();
-      const members = scoped.map((m) => {
-        if (m.id !== id) {
-          return patch.isCurrentUser ? { ...m, isCurrentUser: false, updatedAt: now } : m;
-        }
-        return { ...m, ...patch, updatedAt: now };
-      });
-      writeReviewMembers(members);
-      set({ members, currentMember: currentFrom(members), loading: false });
+      const members = scope.members.map((m) => (m.id === id ? { ...m, ...patch, updatedAt: now } : patch.isCurrentUser ? { ...m, isCurrentUser: false, updatedAt: now } : m));
+      scope.saveMembers(members);
+      set({ members, currentMember: currentFrom(members), reviewScope: { ...scope, members }, loading: false });
       return true;
     }
-
     try {
-      const res = await fetch("/api/team", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, patch: dbPatch(patch) }),
-      });
+      const res = await fetch("/api/team", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, patch: dbPatch(patch) }) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       set((s) => {
-        const members = s.members.map((m) => {
-          if (m.id !== id) return patch.isCurrentUser ? { ...m, isCurrentUser: false } : m;
-          return { ...m, ...patch };
-        });
+        const members = s.members.map((m) => (m.id === id ? { ...m, ...patch } : patch.isCurrentUser ? { ...m, isCurrentUser: false } : m));
         return { members, currentMember: currentFrom(members) };
       });
       return true;
@@ -256,14 +207,13 @@ export const useTeamStore = create<TeamState>((set, get) => ({
   },
 
   deleteMember: async (id) => {
-    const scoped = activeReviewMembers();
-    if (scoped) {
-      const members = scoped.filter((m) => m.id !== id);
-      writeReviewMembers(members);
-      set({ members, currentMember: currentFrom(members), loading: false });
+    const scope = get().reviewScope;
+    if (scope) {
+      const members = scope.members.filter((m) => m.id !== id);
+      scope.saveMembers(members);
+      set({ members, currentMember: currentFrom(members), reviewScope: { ...scope, members }, loading: false });
       return true;
     }
-
     try {
       const res = await fetch(`/api/team?id=${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -281,18 +231,14 @@ export const useTeamStore = create<TeamState>((set, get) => ({
   setCurrent: async (id) => get().updateMember(id, { isCurrentUser: true }),
 
   saveProfile: async (p) => {
-    if (useReviewStore.getState().review) {
-      writeReviewProfile(p);
+    const scope = get().reviewScope;
+    if (scope) {
+      scope.saveProfile(p);
       set({ profile: p, loading: false });
       return true;
     }
-
     try {
-      const res = await fetch("/api/team/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(p),
-      });
+      const res = await fetch("/api/team/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       set({ profile: p });
       return true;

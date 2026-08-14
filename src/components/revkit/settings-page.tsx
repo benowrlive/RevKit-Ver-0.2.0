@@ -1976,18 +1976,25 @@ export function SettingsPage() {
   const setMembers = useTeamStore((s) => s.setMembers);
   const setProfile = useTeamStore((s) => s.setProfile);
   const setLoading = useTeamStore((s) => s.setLoading);
+  const setReviewScope = useTeamStore((s) => s.setReviewScope);
   const review = useReviewStore((s) => s.review);
+  const setProtocolTeamMembers = useReviewStore((s) => s.setProtocolTeamMembers);
+  const setProtocolTeamProfile = useReviewStore((s) => s.setProtocolTeamProfile);
 
   // Load team + profile from the active review, or from app-wide defaults on the welcome screen.
   useEffect(() => {
     if (review) {
       const team = review.protocol?.team;
-      setMembers(team?.members ?? []);
-      setProfile(team?.profile ?? DEFAULT_PROFILE);
+      const members = team?.members ?? [];
+      const profile = team?.profile ?? DEFAULT_PROFILE;
+      setReviewScope({ members, saveMembers: setProtocolTeamMembers, saveProfile: setProtocolTeamProfile });
+      setMembers(members);
+      setProfile(profile);
       setLoading(false);
       return;
     }
 
+    setReviewScope(null);
     let cancelled = false;
     const ctrl = new AbortController();
     setLoading(true);
@@ -2013,7 +2020,7 @@ export function SettingsPage() {
       cancelled = true;
       ctrl.abort();
     };
-  }, [review, setMembers, setProfile, setLoading]);
+  }, [review, setMembers, setProfile, setLoading, setReviewScope, setProtocolTeamMembers, setProtocolTeamProfile]);
 
   return (
     <div className="min-w-0 space-y-4">
