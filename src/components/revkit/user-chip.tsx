@@ -4,11 +4,16 @@
 "use client";
 
 import { useTeamStore, initialsFrom } from "@/lib/team/store";
+import { useReviewStore } from "@/lib/project/state";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { UserCircle } from "@phosphor-icons/react";
 
 export function UserChip({ onClick }: { onClick?: () => void }) {
-  const current = useTeamStore((s) => s.currentMember);
+  const globalCurrent = useTeamStore((s) => s.currentMember);
+  const review = useReviewStore((s) => s.review);
+  const current = review
+    ? review.protocol?.team?.members.find((member) => member.isCurrentUser) ?? null
+    : globalCurrent;
 
   if (!current) {
     return (

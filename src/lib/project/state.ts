@@ -20,11 +20,38 @@ import type {
   ReviewType,
   Subgroup,
   DataPoint,
+  TeamMember,
+  UserProfile,
 } from "@/lib/types";
 import { newId } from "@/lib/project/id";
-import { createProtocolWorkspace } from "@/lib/protocol/prospero";
+import { createProtocolWorkspace, formatTeamMembersForProspero } from "@/lib/protocol/prospero";
 
 export type ToastFn = (msg: string, opts?: { description?: string; variant?: "default" | "destructive" }) => void;
+
+function defaultReviewProfile(): UserProfile {
+  return {
+    density: "compact",
+    fontScale: "medium",
+    reduceMotion: false,
+    tooltipsEnabled: true,
+    tooltipsDensity: "detailed",
+    defaultEffectMeasure: "OR",
+    defaultMethod: "MH",
+    defaultModel: "fixed",
+    defaultConfidence: 0.95,
+    decimalPlaces: 2,
+    autoBackupMinutes: 15,
+    maxRecentFiles: 20,
+  };
+}
+
+function protocolForReview(review: Review): ProtocolWorkspace {
+  return review.protocol ?? createProtocolWorkspace({
+    title: review.title,
+    type: review.type,
+    researchQuestion: review.researchQuestion,
+  });
+}
 
 interface ReviewState {
   review: Review | null;
@@ -80,6 +107,8 @@ interface ReviewState {
   deleteRobAssessment: (id: string) => void;
   setQuadas3Workspace: (workspace: Quadas3Workspace) => void;
   setProtocolWorkspace: (workspace: ProtocolWorkspace) => void;
+  setProtocolTeamMembers: (members: TeamMember[]) => void;
+  setProtocolTeamProfile: (profile: UserProfile) => void;
 
   // PRISMA flow
   setPrismaBox: (boxId: string, count: number, autoCount?: boolean) => void;
@@ -630,6 +659,63 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       };
     }),
 
+  setProtocolTeamMembers: (members) =>
+    set((s) => {
+      if (!s.review) return s;
+      const now = new Date().toISOString();
+      const protocol = protocolForReview(s.review);
+      const team = {
+        version: "1.0" as const,
+        members,
+        profile: protocol.team?.profile ?? defaultReviewProfile(),
+        updatedAt: now,
+      };
+      return {
+        review: {
+          ...s.review,
+          protocol: {
+            ...protocol,
+            answers: {
+              ...protocol.answers,
+              teamMembers: formatTeamMembersForProspero(members),
+            },
+            team,
+            updatedAt: now,
+          },
+          updatedAt: now,
+        },
+        isDirty: true,
+      };
+    }),
+
+  setProtocolTeamProfile: (profile) =>
+    set((s) => {
+      if (!s.review) return s;
+      const now = new Date().toISOString();
+      const protocol = protocolForReview(s.review);
+      const team = {
+        version: "1.0" as const,
+        members: protocol.team?.members ?? [],
+        profile,
+        updatedAt: now,
+      };
+      return {
+        review: {
+          ...s.review,
+          protocol: {
+            ...protocol,
+            answers: {
+              ...protocol.answers,
+              teamMembers: formatTeamMembersForProspero(team.members),
+            },
+            team,
+            updatedAt: now,
+          },
+          updatedAt: now,
+        },
+        isDirty: true,
+      };
+    }),
   setPrismaBox: (boxId, count, autoCount) =>
     set((s) => {
       if (!s.review) return s;

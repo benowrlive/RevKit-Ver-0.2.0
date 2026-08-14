@@ -1,12 +1,15 @@
-// src/lib/team/store.ts — Zustand store for the local team + user profile.
+// src/lib/team/store.ts - Zustand store for reviewer identity, team, and settings.
 //
-// Backed by SQLite via the /api/team endpoints. State is loaded once on
-// mount (in page.tsx) and cached client-side; mutations write through
-// to the server.
+// Inside an open review, profile/team data is stored on review.protocol.team so
+// each review can have its own team and PROSPERO draft attribution. On the
+// welcome screen, the same API still falls back to the app-wide /api/team
+// defaults.
 
 "use client";
 
 import { create } from "zustand";
+import { newId } from "@/lib/project/id";
+import { useReviewStore } from "@/lib/project/state";
 
 export interface TeamMember {
   id: string;
@@ -16,6 +19,10 @@ export interface TeamMember {
   initials: string;
   color: string;
   isCurrentUser: boolean;
+  affiliation?: string | null;
+  country?: string | null;
+  contribution?: string | null;
+  conflictOfInterest?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -107,6 +114,65 @@ function initialsFromName(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function activeReviewMembers(): TeamMember[] | null {
+  const review = useReviewStore.getState().review;
+  if (!review) return null;
+  return review.protocol?.team?.members ?? [];
+}
+
+function writeReviewMembers(members: TeamMember[]): void {
+  useReviewStore.getState().setProtocolTeamMembers(members);
+}
+
+function writeReviewProfile(profile: UserProfile): void {
+  useReviewStore.getState().setProtocolTeamProfile(profile);
+}
+
+function localMember(input: Omit<TeamMember, "id" | "createdAt" | "updatedAt">): TeamMember {
+  const now = new Date().toISOString();
+  return {
+    id: newId("member"),
+    name: input.name,
+    email: input.email ?? null,
+    role: input.role,
+    initials: input.initials || initialsFromName(input.name),
+    color: input.color || randomColor(),
+    isCurrentUser: input.isCurrentUser,
+    affiliation: input.affiliation ?? null,
+    country: input.country ?? null,
+    contribution: input.contribution ?? null,
+    conflictOfInterest: input.conflictOfInterest ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function currentFrom(members: TeamMember[]): TeamMember | null {
+  return members.find((m) => m.isCurrentUser) ?? null;
+}
+
+function dbMemberPayload(input: Omit<TeamMember, "id" | "createdAt" | "updatedAt">) {
+  return {
+    name: input.name,
+    email: input.email ?? null,
+    role: input.role,
+    initials: input.initials || initialsFromName(input.name),
+    color: input.color || randomColor(),
+    isCurrentUser: input.isCurrentUser,
+  };
+}
+
+function dbPatch(patch: Partial<TeamMember>) {
+  return {
+    ...(patch.name !== undefined ? { name: patch.name } : {}),
+    ...(patch.email !== undefined ? { email: patch.email ?? null } : {}),
+    ...(patch.role !== undefined ? { role: patch.role } : {}),
+    ...(patch.initials !== undefined ? { initials: patch.initials } : {}),
+    ...(patch.color !== undefined ? { color: patch.color } : {}),
+    ...(patch.isCurrentUser !== undefined ? { isCurrentUser: patch.isCurrentUser } : {}),
+  };
+}
+
 export const useTeamStore = create<TeamState>((set, get) => ({
   members: [],
   currentMember: null,
@@ -114,26 +180,29 @@ export const useTeamStore = create<TeamState>((set, get) => ({
   loading: true,
 
   setMembers: (members) => {
-    set({ members, currentMember: members.find((m) => m.isCurrentUser) ?? null });
+    set({ members, currentMember: currentFrom(members) });
   },
   setCurrentMember: (m) => set({ currentMember: m }),
   setProfile: (p) => set({ profile: p }),
   setLoading: (b) => set({ loading: b }),
 
   addMember: async (input) => {
+    const scoped = activeReviewMembers();
+    if (scoped) {
+      const member = localMember(input);
+      const members = member.isCurrentUser
+        ? [member, ...scoped.map((m) => ({ ...m, isCurrentUser: false, updatedAt: member.updatedAt }))]
+        : [...scoped, member];
+      writeReviewMembers(members);
+      set({ members, currentMember: currentFrom(members), loading: false });
+      return member;
+    }
+
     try {
-      const payload = {
-        name: input.name,
-        email: input.email ?? null,
-        role: input.role,
-        initials: input.initials || initialsFromName(input.name),
-        color: input.color || randomColor(),
-        isCurrentUser: input.isCurrentUser,
-      };
       const res = await fetch("/api/team", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(dbMemberPayload(input)),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { member: TeamMember };
@@ -141,10 +210,7 @@ export const useTeamStore = create<TeamState>((set, get) => ({
         const members = input.isCurrentUser
           ? [data.member, ...s.members.map((m) => ({ ...m, isCurrentUser: false }))]
           : [...s.members, data.member];
-        return {
-          members,
-          currentMember: input.isCurrentUser ? data.member : s.currentMember,
-        };
+        return { members, currentMember: currentFrom(members) };
       });
       return data.member;
     } catch (e) {
@@ -154,20 +220,34 @@ export const useTeamStore = create<TeamState>((set, get) => ({
   },
 
   updateMember: async (id, patch) => {
+    const scoped = activeReviewMembers();
+    if (scoped) {
+      const now = new Date().toISOString();
+      const members = scoped.map((m) => {
+        if (m.id !== id) {
+          return patch.isCurrentUser ? { ...m, isCurrentUser: false, updatedAt: now } : m;
+        }
+        return { ...m, ...patch, updatedAt: now };
+      });
+      writeReviewMembers(members);
+      set({ members, currentMember: currentFrom(members), loading: false });
+      return true;
+    }
+
     try {
       const res = await fetch("/api/team", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, patch }),
+        body: JSON.stringify({ id, patch: dbPatch(patch) }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      set((s) => ({
-        members: s.members.map((m) => (m.id === id ? { ...m, ...patch } : m)),
-        currentMember:
-          s.currentMember?.id === id
-            ? { ...s.currentMember, ...patch }
-            : s.currentMember,
-      }));
+      set((s) => {
+        const members = s.members.map((m) => {
+          if (m.id !== id) return patch.isCurrentUser ? { ...m, isCurrentUser: false } : m;
+          return { ...m, ...patch };
+        });
+        return { members, currentMember: currentFrom(members) };
+      });
       return true;
     } catch (e) {
       console.error("updateMember failed", e);
@@ -176,13 +256,21 @@ export const useTeamStore = create<TeamState>((set, get) => ({
   },
 
   deleteMember: async (id) => {
+    const scoped = activeReviewMembers();
+    if (scoped) {
+      const members = scoped.filter((m) => m.id !== id);
+      writeReviewMembers(members);
+      set({ members, currentMember: currentFrom(members), loading: false });
+      return true;
+    }
+
     try {
       const res = await fetch(`/api/team?id=${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      set((s) => ({
-        members: s.members.filter((m) => m.id !== id),
-        currentMember: s.currentMember?.id === id ? null : s.currentMember,
-      }));
+      set((s) => {
+        const members = s.members.filter((m) => m.id !== id);
+        return { members, currentMember: currentFrom(members) };
+      });
       return true;
     } catch (e) {
       console.error("deleteMember failed", e);
@@ -190,21 +278,15 @@ export const useTeamStore = create<TeamState>((set, get) => ({
     }
   },
 
-  setCurrent: async (id) => {
-    const ok = await get().updateMember(id, { isCurrentUser: true });
-    if (ok) {
-      set((s) => ({
-        members: s.members.map((m) => ({
-          ...m,
-          isCurrentUser: m.id === id,
-        })),
-        currentMember: s.members.find((m) => m.id === id) ?? null,
-      }));
-    }
-    return ok;
-  },
+  setCurrent: async (id) => get().updateMember(id, { isCurrentUser: true }),
 
   saveProfile: async (p) => {
+    if (useReviewStore.getState().review) {
+      writeReviewProfile(p);
+      set({ profile: p, loading: false });
+      return true;
+    }
+
     try {
       const res = await fetch("/api/team/profile", {
         method: "PUT",

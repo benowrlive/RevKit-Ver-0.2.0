@@ -76,6 +76,7 @@ import { PresetSelect, type PresetGroup } from "@/components/revkit/preset-selec
 import { InfoTooltip } from "@/components/revkit/info-tooltip";
 import { ThemeToggle } from "@/components/revkit/theme-toggle";
 import { loadRecentFiles, removeRecentFile } from "@/lib/project/id";
+import { useReviewStore } from "@/lib/project/state";
 
 // ─── Tabs ────────────────────────────────────────────────────────────────
 
@@ -429,8 +430,11 @@ interface MemberFormState {
   initials: string;
   color: string;
   isCurrentUser: boolean;
+  affiliation: string;
+  country: string;
+  contribution: string;
+  conflictOfInterest: string;
 }
-
 const EMPTY_MEMBER: MemberFormState = {
   name: "",
   email: "",
@@ -438,8 +442,11 @@ const EMPTY_MEMBER: MemberFormState = {
   initials: "",
   color: TEAM_COLORS[0] ?? "#14b8a6",
   isCurrentUser: false,
+  affiliation: "",
+  country: "",
+  contribution: "",
+  conflictOfInterest: "",
 };
-
 function deriveInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "";
@@ -455,9 +462,12 @@ function memberToForm(m: TeamMember): MemberFormState {
     initials: m.initials,
     color: m.color,
     isCurrentUser: m.isCurrentUser,
+    affiliation: m.affiliation ?? "",
+    country: m.country ?? "",
+    contribution: m.contribution ?? "",
+    conflictOfInterest: m.conflictOfInterest ?? "",
   };
 }
-
 function MemberFormDialog({
   open,
   mode,
@@ -492,6 +502,10 @@ function MemberFormDialog({
       name,
       initials,
       email: form.email.trim(),
+      affiliation: form.affiliation.trim(),
+      country: form.country.trim(),
+      contribution: form.contribution.trim(),
+      conflictOfInterest: form.conflictOfInterest.trim(),
     });
     setBusy(false);
     if (ok) onClose();
@@ -499,7 +513,7 @@ function MemberFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md modal-origin">
+      <DialogContent className="modal-origin max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-base">
             {mode === "add" ? "Add team member" : "Edit team member"}
@@ -549,6 +563,80 @@ function MemberFormDialog({
             />
           </div>
 
+
+          <div className="space-y-1.5">
+            <FieldLabel
+              info={{
+                title: "Affiliation",
+                what: "University, hospital, department, or organisation.",
+                why: "PROSPERO asks who the team members are and where they are based.",
+              }}
+            >
+              Affiliation
+            </FieldLabel>
+            <input
+              className="input-compact h-8"
+              value={form.affiliation}
+              onChange={(e) => setForm({ ...form, affiliation: e.target.value })}
+              placeholder="e.g. Department of Critical Care, ABC Medical College"
+            />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <FieldLabel
+                info={{
+                  title: "Country",
+                  what: "Country for this member or institution.",
+                  why: "Useful for the registration record and reviewer contact details.",
+                }}
+              >
+                Country
+              </FieldLabel>
+              <input
+                className="input-compact h-8"
+                value={form.country}
+                onChange={(e) => setForm({ ...form, country: e.target.value })}
+                placeholder="e.g. India"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <FieldLabel
+                info={{
+                  title: "Review contribution",
+                  what: "What this person will do in the review.",
+                  why: "Makes the PROSPERO team section clearer and easier to edit later.",
+                }}
+              >
+                Review role notes
+              </FieldLabel>
+              <input
+                className="input-compact h-8"
+                value={form.contribution}
+                onChange={(e) => setForm({ ...form, contribution: e.target.value })}
+                placeholder="e.g. Screening and data extraction"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <FieldLabel
+              info={{
+                title: "Conflict of interest",
+                what: "Any personal, financial, or academic interest to declare.",
+                why: "If none are known, write 'None declared' so the export is complete.",
+              }}
+            >
+              Conflict of interest
+            </FieldLabel>
+            <input
+              className="input-compact h-8"
+              value={form.conflictOfInterest}
+              onChange={(e) => setForm({ ...form, conflictOfInterest: e.target.value })}
+              placeholder="e.g. None declared"
+            />
+          </div>
           <div className="space-y-1.5">
             <FieldLabel
               info={{
@@ -1022,33 +1110,31 @@ function TeamSection() {
   }
 
   async function handleSubmit(state: MemberFormState): Promise<boolean> {
-    if (dialogMode === "edit" && editingId) {
-      const ok = await updateMember(editingId, {
-        name: state.name,
-        email: state.email || null,
-        role: state.role,
-        initials: state.initials,
-        color: state.color,
-        isCurrentUser: state.isCurrentUser,
-      });
-      if (ok) toast.success("Team member updated");
-      else toast.error("Failed to update member");
-      return ok;
-    }
-    // add
-    const member = await addMember({
+    const payload = {
       name: state.name,
       email: state.email || null,
       role: state.role,
       initials: state.initials,
       color: state.color,
       isCurrentUser: state.isCurrentUser,
-    });
+      affiliation: state.affiliation || null,
+      country: state.country || null,
+      contribution: state.contribution || null,
+      conflictOfInterest: state.conflictOfInterest || null,
+    };
+
+    if (dialogMode === "edit" && editingId) {
+      const ok = await updateMember(editingId, payload);
+      if (ok) toast.success("Team member updated");
+      else toast.error("Failed to update member");
+      return ok;
+    }
+
+    const member = await addMember(payload);
     if (member) toast.success("Team member added");
     else toast.error("Failed to add member");
     return Boolean(member);
   }
-
   async function confirmDelete() {
     if (!pendingDelete) return;
     setClearing(true);
@@ -1890,9 +1976,18 @@ export function SettingsPage() {
   const setMembers = useTeamStore((s) => s.setMembers);
   const setProfile = useTeamStore((s) => s.setProfile);
   const setLoading = useTeamStore((s) => s.setLoading);
+  const review = useReviewStore((s) => s.review);
 
-  // Load team + profile from the server on mount.
+  // Load team + profile from the active review, or from app-wide defaults on the welcome screen.
   useEffect(() => {
+    if (review) {
+      const team = review.protocol?.team;
+      setMembers(team?.members ?? []);
+      setProfile(team?.profile ?? DEFAULT_PROFILE);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     const ctrl = new AbortController();
     setLoading(true);
@@ -1918,7 +2013,7 @@ export function SettingsPage() {
       cancelled = true;
       ctrl.abort();
     };
-  }, [setMembers, setProfile, setLoading]);
+  }, [review, setMembers, setProfile, setLoading]);
 
   return (
     <div className="min-w-0 space-y-4">
@@ -1930,6 +2025,12 @@ export function SettingsPage() {
             Reviewer identity, team, defaults, display, tooltips, backups, and about.
           </p>
         </div>
+        {review && (
+          <span className="badge-tiny badge-teal">
+            <Check size={10} />
+            This review only
+          </span>
+        )}
         {loading && (
           <span className="badge-tiny badge-neutral">
             <Database size={10} />

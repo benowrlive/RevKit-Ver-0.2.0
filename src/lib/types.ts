@@ -281,6 +281,52 @@ export type ProsperoFieldId =
   | "meshTerms"
   | "similarReviews";
 
+export type TeamRole =
+  | "lead_reviewer"
+  | "reviewer"
+  | "methodologist"
+  | "statistician"
+  | "librarian"
+  | "consumer";
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email?: string | null;
+  role: TeamRole;
+  initials: string;
+  color: string;
+  isCurrentUser: boolean;
+  affiliation?: string | null;
+  country?: string | null;
+  contribution?: string | null;
+  conflictOfInterest?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserProfile {
+  density: "compact" | "default" | "dense";
+  fontScale: "small" | "medium" | "large";
+  reduceMotion: boolean;
+  tooltipsEnabled: boolean;
+  tooltipsDensity: "minimal" | "detailed";
+  defaultEffectMeasure: string;
+  defaultMethod: string;
+  defaultModel: "fixed" | "random";
+  defaultConfidence: number;
+  decimalPlaces: number;
+  autoBackupMinutes: number;
+  maxRecentFiles: number;
+}
+
+export interface ReviewTeamWorkspace {
+  version: "1.0";
+  members: TeamMember[];
+  profile: UserProfile;
+  updatedAt: string;
+}
+
 export interface DtaProtocolQuestion {
   id: string;
   population: string;
@@ -293,6 +339,7 @@ export interface ProtocolWorkspace {
   framework: "PICO" | "PIRD";
   answers: Partial<Record<ProsperoFieldId, string>>;
   dtaQuestions: DtaProtocolQuestion[];
+  team?: ReviewTeamWorkspace | null;
   updatedAt: string;
 }
 
