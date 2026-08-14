@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowRight,
   ChartBar,
   CheckCircle,
@@ -23,6 +30,7 @@ import { RevKitIcon } from "@/components/revkit/icons";
 import { NewReviewWizard } from "@/components/revkit/new-review-wizard";
 import { ThemeToggle } from "@/components/revkit/theme-toggle";
 import type { ReviewType, ReviewSubType } from "@/lib/types";
+import { EXAMPLE_REVIEWS } from "@/lib/project/example-reviews";
 import { removeRecentFile } from "@/lib/project/id";
 
 interface Props {
@@ -33,6 +41,7 @@ interface Props {
     researchQuestion: string;
   }) => void;
   onOpen: (id: string) => void;
+  onLoadExample: (type: ReviewType) => void;
   refreshKey: number;
 }
 
@@ -72,8 +81,9 @@ const PHASES = [
   { value: "complete", label: "Complete", icon: CheckCircle },
 ] as const;
 
-export function WelcomeScreen({ onNew, onOpen, refreshKey }: Props) {
+export function WelcomeScreen({ onNew, onOpen, onLoadExample, refreshKey }: Props) {
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [examplesOpen, setExamplesOpen] = useState(false);
   const [saved, setSaved] = useState<SavedReviewMeta[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -120,15 +130,6 @@ export function WelcomeScreen({ onNew, onOpen, refreshKey }: Props) {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
   }
 
-  function loadDemo() {
-    onNew({
-      title: "Aspirin for secondary prevention of cardiovascular events (demo)",
-      type: "INTERVENTION",
-      subType: null,
-      researchQuestion:
-        "In adults with prior MI, does aspirin reduce all-cause mortality vs placebo?",
-    });
-  }
 
   const reviews = saved ?? [];
   const savedCount = reviews.length;
@@ -265,9 +266,9 @@ export function WelcomeScreen({ onNew, onOpen, refreshKey }: Props) {
                   <span className="eyebrow">See an example</span>
                   <h2>Explore a ready-made review.</h2>
                   <p>See how RevKit works with an example that is ready to explore.</p>
-                  <button type="button" onClick={loadDemo} className="demo-action">
+                  <button type="button" onClick={() => setExamplesOpen(true)} className="demo-action">
                     <Sparkle size={16} weight="fill" />
-                    Open example review
+                    Choose an example
                     <ArrowRight size={15} />
                   </button>
                 </div>
@@ -340,6 +341,47 @@ export function WelcomeScreen({ onNew, onOpen, refreshKey }: Props) {
           });
         }}
       />
+
+      <Dialog open={examplesOpen} onOpenChange={setExamplesOpen}>
+        <DialogContent className="max-w-2xl gap-4 rounded-lg border-border p-5">
+          <DialogHeader className="pr-8">
+            <span className="eyebrow">EXAMPLE LIBRARY</span>
+            <DialogTitle>Choose a review to explore</DialogTitle>
+            <DialogDescription>
+              Each example contains editable studies and data suited to that review type.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-1.5">
+            {EXAMPLE_REVIEWS.map((example) => {
+              const Icon = TYPE_ICONS[example.type] ?? FileText;
+              return (
+                <button
+                  key={example.type}
+                  type="button"
+                  onClick={() => {
+                    setExamplesOpen(false);
+                    onLoadExample(example.type);
+                  }}
+                  className="group grid min-h-16 grid-cols-[38px_minmax(0,1fr)] items-center gap-3 rounded-md border border-border px-3 py-2.5 text-left transition-colors hover:border-accent/40 hover:bg-accent-subtle/40 sm:grid-cols-[38px_minmax(0,1fr)_auto]"
+                >
+                  <span className="grid size-9 place-items-center rounded-md bg-surface-hover text-accent">
+                    <Icon size={18} weight="duotone" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[10px] font-semibold uppercase text-accent">{example.label}</span>
+                    <strong className="block truncate text-[13px] font-semibold">{example.title}</strong>
+                    <span className="mt-0.5 block text-[11px] leading-snug text-muted-fg">{example.description}</span>
+                  </span>
+                  <span className="hidden items-center gap-2 pl-2 text-[10px] text-muted-fg sm:flex">
+                    {example.studyCount} studies
+                    <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

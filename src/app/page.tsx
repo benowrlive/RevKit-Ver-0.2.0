@@ -13,6 +13,7 @@ import { SettingsPage } from "@/components/revkit/settings-page";
 import { useReviewStore } from "@/lib/project/state";
 import { useTeamStore, DEFAULT_PROFILE } from "@/lib/team/store";
 import type { ReviewType, ReviewSubType } from "@/lib/types";
+import { createExampleReview } from "@/lib/project/example-reviews";
 import { toast } from "sonner";
 
 export default function Home() {
@@ -85,6 +86,14 @@ export default function Home() {
     }
   }
 
+  function handleExample(type: ReviewType) {
+    const example = createExampleReview(type);
+    useReviewStore.setState({ review: example, isDirty: true, dbId: null });
+    setView("workspace");
+    setTab("overview");
+    toast.success("Example review opened", { description: example.title });
+  }
+
   function handleExit() {
     if (useReviewStore.getState().isDirty) {
       if (!confirm("You have unsaved changes. Exit to library anyway?")) return;
@@ -111,7 +120,14 @@ export default function Home() {
   }, [view]);
 
   if (view === "welcome" || !review) {
-    return <WelcomeScreen onNew={handleNew} onOpen={handleOpen} refreshKey={welcomeRefreshKey} />;
+    return (
+      <WelcomeScreen
+        onNew={handleNew}
+        onOpen={handleOpen}
+        onLoadExample={handleExample}
+        refreshKey={welcomeRefreshKey}
+      />
+    );
   }
 
   return (
