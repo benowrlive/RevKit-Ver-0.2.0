@@ -1771,7 +1771,7 @@ function AboutSection() {
   }
 
   const facts: { label: string; value: string }[] = [
-    { label: "App version", value: "0.1.0" },
+    { label: "App version", value: "0.2.0" },
     { label: "File format", value: "revkit-1 (v1.0.0)" },
     { label: "License", value: "MIT" },
     {
@@ -1921,7 +1921,7 @@ export function SettingsPage() {
   }, [setMembers, setProfile, setLoading]);
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <header className="flex items-baseline justify-between gap-3">
         <div>
           <p className="eyebrow">RevKit</p>

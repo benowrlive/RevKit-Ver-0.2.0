@@ -269,11 +269,6 @@ export function WorkspaceShell({ active, onTabChange, onExit, children }: Props)
               );
             })}
           </nav>
-          <Separator className="my-1.5 hidden sm:block" />
-          <div className="p-2 space-y-1 text-[10px] text-meta hidden sm:block">
-            <div className="font-mono tabular">{review.id.slice(0, 12)}…</div>
-            <div>revkit-1 · v0.1.0</div>
-          </div>
         </aside>
 
         {/* Main content */}

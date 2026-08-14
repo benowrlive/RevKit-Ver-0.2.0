@@ -29,6 +29,7 @@ import {
 import { RevKitIcon } from "@/components/revkit/icons";
 import { NewReviewWizard } from "@/components/revkit/new-review-wizard";
 import { ThemeToggle } from "@/components/revkit/theme-toggle";
+import { SettingsPage } from "@/components/revkit/settings-page";
 import type { ReviewType, ReviewSubType } from "@/lib/types";
 import { EXAMPLE_REVIEWS } from "@/lib/project/example-reviews";
 import { removeRecentFile } from "@/lib/project/id";
@@ -85,6 +86,7 @@ const PHASES = [
 export function WelcomeScreen({ onNew, onOpen, onLoadExample, refreshKey }: Props) {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [saved, setSaved] = useState<SavedReviewMeta[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -182,6 +184,15 @@ export function WelcomeScreen({ onNew, onOpen, onLoadExample, refreshKey }: Prop
             <div className="topbar-actions">
               <span className="topbar-version">v0.2.0</span>
               <ThemeToggle />
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-muted-fg transition-colors hover:bg-surface-hover hover:text-fg-2"
+                aria-label="Open settings"
+                title="Settings"
+              >
+                <Gear size={14} />
+              </button>
             </div>
           </div>
         </header>
@@ -382,6 +393,17 @@ export function WelcomeScreen({ onNew, onOpen, onLoadExample, refreshKey }: Prop
               );
             })}
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-h-[92vh] min-w-0 overflow-x-hidden overflow-y-auto border-border p-4 sm:max-w-[min(94vw,1100px)] sm:p-5">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>
+              Manage your RevKit profile, preferences, display, backups, and app information.
+            </DialogDescription>
+          </DialogHeader>
+          <SettingsPage />
         </DialogContent>
       </Dialog>
     </div>
