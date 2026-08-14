@@ -159,11 +159,11 @@ export function WorkspaceShell({ active, onTabChange, onExit, children }: Props)
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Top bar — compact 44px, glassmorphism */}
-      <header className="bg-surface backdrop-blur-xl backdrop-saturate-150 border-b border-border sticky top-0 z-30">
-        <div className="flex h-11 items-center justify-between px-3 sm:px-4 gap-2">
+      <header className="glass-topbar sticky top-0 z-30">
+        <div className="flex h-12 items-center justify-between px-3 sm:px-4 gap-2">
           <div className="flex items-center gap-2 min-w-0">
             {/* R logo icon — small, in the topbar */}
-            <RevKitIcon className="size-6 shrink-0" />
+            <RevKitIcon className="size-7 shrink-0" />
             <button
               onClick={onExit}
               className="btn-compact btn-ghost h-7 px-2 text-[12px]"
@@ -232,9 +232,6 @@ export function WorkspaceShell({ active, onTabChange, onExit, children }: Props)
                 <Save size={12} />
               )}
               <span className="hidden sm:inline">{isSaving ? "Saving…" : "Save"}</span>
-              <kbd className="hidden md:inline ml-1 text-[9px] text-primary-foreground/60 border border-primary-foreground/20 rounded px-1">
-                ⌘S
-              </kbd>
             </Button>
           </div>
         </div>
@@ -243,11 +240,11 @@ export function WorkspaceShell({ active, onTabChange, onExit, children }: Props)
       {/* Main: sidebar + content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar — glassmorphism + workflow stepper */}
-        <aside className="bg-sidebar backdrop-blur-xl backdrop-saturate-150 border-r border-border w-14 sm:w-56 shrink-0 overflow-y-auto scrollbar-thin">
+        <aside className="glass-sidebar w-14 sm:w-60 shrink-0 overflow-y-auto scrollbar-thin">
           {/* Workflow progress indicator at top of sidebar */}
           <WorkflowStepper activeTab={active} onTabChange={onTabChange} />
 
-          <nav className="p-1.5 space-y-0.5">
+          <nav className="p-2 space-y-1">
             {WORKFLOW_STAGES.map((item) => {
               const isActive = active === item.id;
               const Icon = item.icon;
@@ -256,7 +253,7 @@ export function WorkspaceShell({ active, onTabChange, onExit, children }: Props)
                   key={item.id}
                   onClick={() => onTabChange(item.id)}
                   data-active={isActive}
-                  className={`btn-compact btn-ghost w-full h-8 px-2 text-[12px] ${
+                  className={`btn-compact btn-ghost w-full h-9 justify-start px-2.5 text-[12px] ${
                     isActive ? "" : ""
                   }`}
                   title={item.label}
@@ -284,7 +281,7 @@ export function WorkspaceShell({ active, onTabChange, onExit, children }: Props)
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
-              className="p-4 sm:p-5 max-w-6xl mx-auto"
+              className="p-4 sm:p-6 max-w-[1440px] mx-auto"
             >
               {children}
             </motion.div>

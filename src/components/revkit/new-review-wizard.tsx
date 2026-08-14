@@ -90,13 +90,6 @@ const STEP_LABELS = [
   "Build the review title",
   "Confirm and create",
 ];
-const STEP_DESCRIPTIONS = [
-  "All 5 Cochrane review types supported. Pick one — you can change most fields later.",
-  "Sub-types are tags that affect suggested fields. Pick None if unsure.",
-  "Pick a PICO format and fill structured fields. We compose the title + draft the research question.",
-  "Review the composed title + research question. Defaults are pre-configured per review type.",
-];
-
 // Apple-style ease (Emil Kowalski's --ease-out value).
 const EMIL_EASE: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
@@ -212,7 +205,6 @@ export function NewReviewWizard({ open, onClose, onCreate }: Props) {
           <DialogTitle className="text-xl font-display font-semibold tracking-display">
             {STEP_LABELS[step]}
           </DialogTitle>
-          <p className="text-xs text-muted-fg">{STEP_DESCRIPTIONS[step]}</p>
         </DialogHeader>
 
         {/* Progress bar */}

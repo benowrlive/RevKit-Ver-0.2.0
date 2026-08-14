@@ -17,13 +17,15 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RevKit — Modern RevMan Clone",
+  title: "RevKit",
   description:
-    "RevKit is an open-source web app for building Cochrane-style systematic reviews. Compact, dense, data-first. Supports all 5 review types with meta-analysis, risk-of-bias, PRISMA flow, and Word/CSV export.",
+    "Plan, manage, analyze, and export systematic reviews with RevKit.",
   keywords: ["RevKit", "RevMan", "systematic review", "meta-analysis", "Cochrane", "PRISMA", "RoB 2", "ROBINS-I", "QUADAS-2"],
   authors: [{ name: "RevKit Contributors" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/r-logo.png",
+    shortcut: "/r-logo.png",
+    apple: "/r-logo.png",
   },
 };
 

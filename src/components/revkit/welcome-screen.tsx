@@ -1,55 +1,40 @@
 "use client";
 
-// src/components/revkit/welcome-screen.tsx
-//
-// RevKit home page — hero + feature cards + library.
-//
-// Design language:
-//   • Dark-first, teal/blue accents from the RevKit logo palette.
-//   • Glassmorphism cards (backdrop-blur + translucent surfaces).
-//   • Hero: icon + "RevKit" wordmark with gradient, eyebrow pill, subtitle, CTAs.
-//   • 3 feature cards: icon tile + title + description + action link.
-//   • Library list: compact glass rows with hover-reveal delete.
-//   • Footer: single line, centered, muted.
-
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Plus,
-  FolderOpen,
-  Trash,
-  FileText,
-  Sparkle,
+  ArrowRight,
   ChartBar,
-  ShieldCheck,
-  Stack,
-  Export,
-  Microscope,
+  CheckCircle,
+  FileText,
   Flask,
+  FolderOpen,
   Gear,
+  Plus,
   Pulse,
-  CaretRight,
+  ShieldCheck,
+  Sparkle,
+  Stack,
+  Trash,
+  TrendUp,
 } from "@phosphor-icons/react";
-import { RevKitLogo, RevKitIcon } from "@/components/revkit/icons";
+import { RevKitIcon } from "@/components/revkit/icons";
 import { NewReviewWizard } from "@/components/revkit/new-review-wizard";
 import { ThemeToggle } from "@/components/revkit/theme-toggle";
 import type { ReviewType, ReviewSubType } from "@/lib/types";
 import { removeRecentFile } from "@/lib/project/id";
 
 interface Props {
-  onNew: (input: { title: string; type: ReviewType; subType: ReviewSubType; researchQuestion: string }) => void;
+  onNew: (input: {
+    title: string;
+    type: ReviewType;
+    subType: ReviewSubType;
+    researchQuestion: string;
+  }) => void;
   onOpen: (id: string) => void;
   refreshKey: number;
 }
-
-const TYPE_ICONS: Record<string, React.ElementType> = {
-  INTERVENTION: Pulse,
-  DTA: Microscope,
-  METHODOLOGY: Flask,
-  OVERVIEW: Stack,
-  FLEXIBLE: Gear,
-};
 
 interface SavedReviewMeta {
   id: string;
@@ -62,11 +47,29 @@ interface SavedReviewMeta {
   researchQuestion: string | null;
 }
 
-const FEATURES = [
-  { icon: ChartBar, label: "Meta-analysis", desc: "MH · Peto · IV · DL pooling" },
-  { icon: ShieldCheck, label: "Risk of bias", desc: "RoB 2 · ROBINS-I · QUADAS-2" },
-  { icon: Stack, label: "PRISMA 2020", desc: "11-box flow diagram" },
-  { icon: Export, label: "Exports", desc: "Word · CSV · PNG · SVG" },
+const TYPE_ICONS: Record<string, React.ElementType> = {
+  INTERVENTION: Pulse,
+  DTA: ShieldCheck,
+  METHODOLOGY: Flask,
+  OVERVIEW: Stack,
+  FLEXIBLE: Gear,
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  INTERVENTION: "Intervention",
+  DTA: "Diagnostic test",
+  METHODOLOGY: "Methods",
+  OVERVIEW: "Overview",
+  FLEXIBLE: "Flexible",
+};
+
+const PHASES = [
+  { value: "scoping", label: "Planning", icon: FileText },
+  { value: "screening", label: "Choosing studies", icon: FolderOpen },
+  { value: "extraction", label: "Collecting data", icon: Stack },
+  { value: "analysis", label: "Results", icon: ChartBar },
+  { value: "writing", label: "Writing", icon: FileText },
+  { value: "complete", label: "Complete", icon: CheckCircle },
 ] as const;
 
 export function WelcomeScreen({ onNew, onOpen, refreshKey }: Props) {
@@ -77,18 +80,21 @@ export function WelcomeScreen({ onNew, onOpen, refreshKey }: Props) {
   useEffect(() => {
     let cancelled = false;
     const ctrl = new AbortController();
+    setLoading(true);
+
     fetch("/api/reviews", { signal: ctrl.signal })
-      .then((r) => r.json())
+      .then((response) => response.json())
       .then((data: { reviews?: SavedReviewMeta[] }) => {
         if (cancelled) return;
         setSaved(data.reviews ?? []);
         setLoading(false);
       })
-      .catch((err: unknown) => {
+      .catch((error: unknown) => {
         if (ctrl.signal.aborted || cancelled) return;
         setLoading(false);
-        console.error("Failed to load saved reviews", err);
+        console.error("Failed to load saved reviews", error);
       });
+
     return () => {
       cancelled = true;
       ctrl.abort();
@@ -97,20 +103,21 @@ export function WelcomeScreen({ onNew, onOpen, refreshKey }: Props) {
 
   function handleDelete(id: string) {
     if (!confirm("Delete this review permanently? This cannot be undone.")) return;
+
     fetch(`/api/reviews/${id}`, { method: "DELETE" })
       .then(() => {
-        setSaved((prev) => prev?.filter((r) => r.id !== id) ?? []);
+        setSaved((previous) => previous?.filter((review) => review.id !== id) ?? []);
         removeRecentFile(id);
         toast.success("Review deleted");
       })
-      .catch((e: unknown) => {
-        const msg = e instanceof Error ? e.message : "Unknown error";
-        toast.error(`Failed to delete: ${msg}`);
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        toast.error(`Failed to delete: ${message}`);
       });
   }
 
-  function scrollToLibrary() {
-    document.getElementById("recent-saved")?.scrollIntoView({ behavior: "smooth" });
+  function scrollTo(sectionId: string) {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
   }
 
   function loadDemo() {
@@ -123,269 +130,193 @@ export function WelcomeScreen({ onNew, onOpen, refreshKey }: Props) {
     });
   }
 
+  const reviews = saved ?? [];
+  const savedCount = reviews.length;
+  const completedCount = reviews.filter(
+    (review) => review.status === "completed" || review.phase === "complete",
+  ).length;
+  const activeCount = savedCount - completedCount;
+  const recentCount = reviews.filter((review) => {
+    const age = Date.now() - new Date(review.updatedAt).getTime();
+    return age >= 0 && age <= 7 * 24 * 60 * 60 * 1000;
+  }).length;
+  const typeBreakdown = Object.entries(
+    reviews.reduce<Record<string, number>>((counts, review) => {
+      counts[review.type] = (counts[review.type] ?? 0) + 1;
+      return counts;
+    }, {}),
+  ).sort((a, b) => b[1] - a[1]);
+  const phaseCounts = reviews.reduce<Record<string, number>>((counts, review) => {
+    counts[review.phase] = (counts[review.phase] ?? 0) + 1;
+    return counts;
+  }, {});
+
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* ── Sticky top bar ─────────────────────────────────────────────── */}
-      <header className="bg-surface backdrop-blur-xl backdrop-saturate-150 border-b border-border sticky top-0 z-10 h-12">
-        <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Left: R logo icon + "RevKit" wordmark */}
-          <div className="flex items-center gap-2">
-            <RevKitIcon className="size-7" />
-            <span className="text-md font-semibold tracking-display">RevKit</span>
-          </div>
-          {/* Right: version + theme toggle */}
-          <div className="flex items-center gap-3">
-            <span className="hidden text-xs uppercase tracking-[0.04em] text-meta sm:inline">
-              v0.1.0 · MIT
-            </span>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
+    <div className="premium-dashboard min-h-screen bg-background">
+      <div className="dashboard-ambient" aria-hidden="true" />
 
-      {/* ── Hero — icon + wordmark + eyebrow + subtitle + CTAs ─────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
-        <div className="mx-auto max-w-4xl enter-pop flex flex-col items-center text-center">
-
-          {/* Eyebrow pill */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent-subtle/50 px-4 py-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">
-              Systematic Reviews · Meta-Analysis · Evidence Synthesis
-            </span>
-          </div>
-
-          {/* Logo icon + wordmark */}
-          <div className="flex items-center gap-4 sm:gap-6 mb-4">
-            <RevKitLogo className="size-16 sm:size-20 shrink-0" />
-            <h1
-              className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-none"
-              style={{
-                background: "linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              RevKit
-            </h1>
-          </div>
-
-          {/* Decorative dots */}
-          <div className="flex items-center gap-2 mb-4">
-            <span className="size-2 rounded-full bg-primary" />
-            <span className="size-2 rounded-full bg-primary/70" />
-            <span className="size-2 rounded-full bg-accent/70" />
-            <span className="size-2 rounded-full bg-accent" />
-          </div>
-
-          {/* Subtitle */}
-          <p className="text-lg sm:text-xl text-muted-fg font-normal max-w-2xl leading-relaxed">
-            Better evidence. Better decisions. Revkit helps you conduct
-            systematic reviews, meta-analyses, and build evidence you can trust.
-          </p>
-
-          {/* CTAs */}
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+      <div className="dashboard-stage">
+        <header className="premium-topbar">
+          <div className="premium-topbar-inner">
             <button
               type="button"
-              onClick={() => setWizardOpen(true)}
-              className="group relative inline-flex h-10 items-center gap-2 rounded-[10px] px-6 text-[15px] font-semibold tracking-tight transition-all hover:scale-[1.02] active:scale-[0.98]"
-              style={{
-                background: "linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)",
-                color: "white",
-                boxShadow:
-                  "0 4px 16px color-mix(in oklab, var(--primary), transparent 55%), 0 0 0 1px color-mix(in oklab, var(--primary), transparent 75%)",
-              }}
+              onClick={() => scrollTo("dashboard-overview")}
+              className="topbar-brand"
+              aria-label="RevKit home"
             >
-              <Plus size={18} weight="bold" className="transition-transform group-hover:scale-110" />
-              Create new review
+              <RevKitIcon className="size-8" />
+              <span>RevKit</span>
             </button>
-            <button
-              type="button"
-              onClick={loadDemo}
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-border bg-surface px-5 text-[15px] font-medium text-fg-2 transition-all hover:bg-surface-hover hover:border-muted-fg active:scale-[0.98]"
-            >
-              <Sparkle size={16} weight="fill" className="text-accent" />
-              Load demo
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Feature highlights — 4 inline items ────────────────────────── */}
-      <section className="px-4 sm:px-6 lg:px-8 mb-12">
-        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-6 sm:grid-cols-4">
-          {FEATURES.map((f) => (
-            <div key={f.label} className="flex flex-col items-center text-center gap-2">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-accent-subtle text-accent">
-                <f.icon size={18} weight="duotone" />
-              </div>
-              <div>
-                <div className="text-sm font-medium tracking-tight">{f.label}</div>
-                <div className="mt-0.5 text-xs text-muted-fg">{f.desc}</div>
-              </div>
+            <div className="topbar-context">Your review workspace</div>
+            <div className="topbar-actions">
+              <span className="topbar-version">v0.2.0</span>
+              <ThemeToggle />
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── 3 action cards ─────────────────────────────────────────────── */}
-      <section className="px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-5 sm:grid-cols-3">
-
-          {/* Card 1 — New Review */}
-          <div className="stagger-item bg-card backdrop-blur-xl backdrop-saturate-150 border border-border rounded-xl shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 flex flex-col p-6 sm:p-7">
-            <div className="flex size-11 items-center justify-center rounded-lg bg-accent-subtle text-accent mb-4">
-              <FileText size={20} weight="duotone" />
-            </div>
-            <h3 className="text-lg font-semibold tracking-tight">New review</h3>
-            <p className="mt-2 text-sm text-muted-fg leading-relaxed flex-1">
-              Start a new systematic review with the 4-step PICO wizard.
-              All 5 Cochrane review types supported.
-            </p>
-            <button
-              type="button"
-              onClick={() => setWizardOpen(true)}
-              className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-accent hover:gap-2 transition-all"
-            >
-              Create <CaretRight size={14} weight="bold" />
-            </button>
           </div>
+        </header>
 
-          {/* Card 2 — Browse library */}
-          <div className="stagger-item bg-card backdrop-blur-xl backdrop-saturate-150 border border-border rounded-xl shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 flex flex-col p-6 sm:p-7">
-            <div className="flex size-11 items-center justify-center rounded-lg bg-surface-hover text-fg-2 mb-4">
-              <FolderOpen size={20} weight="duotone" />
-            </div>
-            <h3 className="text-lg font-semibold tracking-tight">Browse library</h3>
-            <p className="mt-2 text-sm text-muted-fg leading-relaxed flex-1">
-              Open a saved review from your library. Continue from where
-              you left off — all data preserved.
-            </p>
-            <button
-              type="button"
-              onClick={scrollToLibrary}
-              className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-fg-2 hover:gap-2 transition-all"
-            >
-              Browse <CaretRight size={14} weight="bold" />
-            </button>
-          </div>
-
-          {/* Card 3 — Demo */}
-          <div className="stagger-item bg-card backdrop-blur-xl backdrop-saturate-150 border border-border rounded-xl shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 flex flex-col p-6 sm:p-7">
-            <div className="flex size-11 items-center justify-center rounded-lg bg-surface-hover text-fg-2 mb-4">
-              <Sparkle size={20} weight="duotone" />
-            </div>
-            <h3 className="text-lg font-semibold tracking-tight">Try a demo</h3>
-            <p className="mt-2 text-sm text-muted-fg leading-relaxed flex-1">
-              See an intervention meta-analysis with 5 RCTs pre-loaded.
-              Forest plot, heterogeneity, and export included.
-            </p>
-            <button
-              type="button"
-              onClick={loadDemo}
-              className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-fg-2 hover:gap-2 transition-all"
-            >
-              Load demo <CaretRight size={14} weight="bold" />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Library list ──────────────────────────────────────────────── */}
-      <section id="recent-saved" className="px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mx-auto max-w-5xl">
-          <div className="section-header">
-            <div className="flex items-baseline gap-3">
-              <span className="eyebrow">Your library</span>
-              {saved && saved.length > 0 && (
-                <span className="text-xs tabular text-meta">
-                  {saved.length} saved
+        <main id="dashboard-overview" className="dashboard-content">
+          <section className="dashboard-heading">
+            <div className="dashboard-intro">
+              <div className="eyebrow">Your workspace</div>
+              <h1>Your reviews</h1>
+              <p>Start a review, continue where you left off, or check how your work is progressing.</p>
+              <button
+                type="button"
+                onClick={() => setWizardOpen(true)}
+                className="dashboard-primary-cta"
+              >
+                <span className="primary-cta-icon">
+                  <Plus size={20} weight="bold" />
                 </span>
-              )}
+                <span className="primary-cta-copy">
+                  <strong>Create a review</strong>
+                  <small>We will guide you step by step</small>
+                </span>
+                <ArrowRight size={18} className="primary-cta-arrow" />
+              </button>
             </div>
+
+          </section>
+
+          <section className="metric-grid" aria-label="Review metrics">
+            <DashboardMetric icon={FolderOpen} label="Total reviews" value={savedCount} tone="cyan" />
+            <DashboardMetric icon={Pulse} label="In progress" value={activeCount} tone="violet" />
+            <DashboardMetric icon={CheckCircle} label="Finished" value={completedCount} tone="green" />
+            <DashboardMetric icon={TrendUp} label="Worked on this week" value={recentCount} tone="amber" />
+          </section>
+
+          <div className="dashboard-grid">
+            <section id="review-library" className="dashboard-glass dashboard-library">
+              <div className="panel-heading">
+                <div>
+                  <span className="eyebrow">Saved work</span>
+                  <h2>Saved reviews</h2>
+                </div>
+                <span className="panel-count">{savedCount} total</span>
+              </div>
+
+              <div className="library-content">
+                {loading ? (
+                  <div className="grid gap-2">
+                    {[0, 1, 2, 3].map((item) => (
+                      <Skeleton key={item} className="h-[74px] rounded-md" />
+                    ))}
+                  </div>
+                ) : reviews.length > 0 ? (
+                  <div className="review-list enter-pop">
+                    {reviews.map((review, index) => (
+                      <ReviewLibraryRow
+                        key={review.id}
+                        review={review}
+                        stagger={index < 6}
+                        onOpen={onOpen}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="library-empty enter-pop">
+                    <span className="empty-icon">
+                      <FolderOpen size={26} weight="duotone" />
+                    </span>
+                    <h3>No reviews yet</h3>
+                    <p>Your saved reviews will show here.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <aside className="dashboard-side-stack">
+              <section className="dashboard-glass example-panel">
+                <div className="liquid-highlight-content">
+                  <div className="liquid-brand-orbit">
+                    <RevKitIcon className="size-10" />
+                  </div>
+                  <span className="eyebrow">See an example</span>
+                  <h2>Explore a ready-made review.</h2>
+                  <p>See how RevKit works with an example that is ready to explore.</p>
+                  <button type="button" onClick={loadDemo} className="demo-action">
+                    <Sparkle size={16} weight="fill" />
+                    Open example review
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
+              </section>
+
+              <section id="review-portfolio" className="dashboard-glass portfolio-panel">
+                <div className="panel-heading compact">
+                  <div>
+                    <span className="eyebrow">At a glance</span>
+                    <h2>Review types</h2>
+                  </div>
+                  <ChartBar size={19} weight="duotone" className="text-accent" />
+                </div>
+                <div className="portfolio-breakdown">
+                  {typeBreakdown.length > 0 ? (
+                    typeBreakdown.map(([type, count], index) => (
+                      <TypeBreakdownRow
+                        key={type}
+                        type={type}
+                        count={count}
+                        total={savedCount}
+                        index={index}
+                      />
+                    ))
+                  ) : (
+                    <div className="portfolio-empty">Review types will show here after your first review.</div>
+                  )}
+                </div>
+              </section>
+            </aside>
           </div>
 
-          {loading ? (
-            <div className="grid grid-cols-1 gap-2">
-              {[0, 1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-14 rounded-md" />
+          <section id="review-pipeline" className="dashboard-glass pipeline-panel">
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">Progress</span>
+                <h2>Where your reviews are</h2>
+              </div>
+              <span className="panel-note">Number of reviews at each step</span>
+            </div>
+            <div className="pipeline-grid">
+              {PHASES.map((phase, index) => (
+                <div key={phase.value} className="pipeline-stage">
+                  <div className="pipeline-icon">
+                    <phase.icon size={17} weight="duotone" />
+                  </div>
+                  <div>
+                    <strong>{phaseCounts[phase.value] ?? 0}</strong>
+                    <span>{phase.label}</span>
+                  </div>
+                  {index < PHASES.length - 1 && <span className="pipeline-connector" aria-hidden="true" />}
+                </div>
               ))}
             </div>
-          ) : saved && saved.length > 0 ? (
-            <div className="grid grid-cols-1 gap-2 enter-pop">
-              {saved.map((r, idx) => {
-                const Icon = TYPE_ICONS[r.type] ?? FileText;
-                return (
-                  <div
-                    key={r.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onOpen(r.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onOpen(r.id);
-                      }
-                    }}
-                    className={`bg-card backdrop-blur-xl backdrop-saturate-150 border border-border rounded-lg flex cursor-pointer items-center gap-3 p-3 group${
-                      idx < 4 ? " stagger-item" : ""
-                    }`}
-                  >
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-surface-hover text-fg-2">
-                      <Icon size={16} weight="duotone" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-md font-medium">{r.title}</div>
-                      <div className="mt-0.5 truncate text-xs text-muted-fg">
-                        {r.researchQuestion || "No research question"}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <span className="badge-tiny badge-neutral capitalize">
-                        {r.type.toLowerCase()}
-                      </span>
-                      {r.subType && (
-                        <span className="badge-tiny badge-neutral capitalize">
-                          {r.subType.toLowerCase()}
-                        </span>
-                      )}
-                      <span className="badge-tiny badge-neutral capitalize">
-                        {r.phase.replace("_", " ")}
-                      </span>
-                    </div>
-                    <span className="w-[70px] shrink-0 text-right text-xs tabular text-meta">
-                      {new Date(r.updatedAt).toLocaleDateString()}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label="Delete review"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(r.id);
-                      }}
-                      className="btn-compact btn-ghost p-1.5 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-                    >
-                      <Trash size={14} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="bg-card backdrop-blur-xl backdrop-saturate-150 border border-border rounded-lg enter-pop flex flex-col items-center justify-center gap-2 border-dashed p-6 text-center">
-              <FolderOpen size={24} weight="duotone" className="text-meta" />
-              <div className="text-md font-medium">No saved reviews yet</div>
-              <div className="text-xs text-muted-fg">Create your first review above.</div>
-            </div>
-          )}
-        </div>
-      </section>
+          </section>
 
-      {/* ── Footer ────────────────────────────────────────────────────── */}
-      <footer className="py-8 mt-auto">
-        {/* Intentionally empty — user requested removal of footer text. */}
-      </footer>
+        </main>
+      </div>
 
       <NewReviewWizard
         open={wizardOpen}
@@ -402,4 +333,147 @@ export function WelcomeScreen({ onNew, onOpen, refreshKey }: Props) {
       />
     </div>
   );
+}
+
+function DashboardMetric({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number;
+  tone: "cyan" | "violet" | "green" | "amber";
+}) {
+  return (
+    <div className="dashboard-metric premium-metric">
+      <div className={`metric-icon metric-${tone}`}>
+        <Icon size={18} weight="duotone" />
+      </div>
+      <div className="metric-copy">
+        <strong>{value}</strong>
+        <span>{label}</span>
+      </div>
+      <div className={`metric-spark metric-${tone}`} aria-hidden="true" />
+    </div>
+  );
+}
+
+function ReviewLibraryRow({
+  review,
+  stagger,
+  onOpen,
+  onDelete,
+}: {
+  review: SavedReviewMeta;
+  stagger: boolean;
+  onOpen: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const Icon = TYPE_ICONS[review.type] ?? FileText;
+  const progress = getPhaseProgress(review.phase);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(review.id)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(review.id);
+        }
+      }}
+      className={`library-row premium-review-row group${stagger ? " stagger-item" : ""}`}
+    >
+      <div className="review-type-icon">
+        <Icon size={19} weight="duotone" />
+      </div>
+      <div className="review-main">
+        <div className="review-title-line">
+          <strong>{review.title}</strong>
+          <span className="review-type-label">{TYPE_LABELS[review.type] ?? toTitleCase(review.type)}</span>
+        </div>
+        <p>{review.researchQuestion || "No review question added yet"}</p>
+        <div className="review-progress-mobile">
+          <span style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+      <div className="review-stage">
+        <span>{toTitleCase(review.phase)}</span>
+        <div className="review-progress">
+          <span style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+      <time dateTime={review.updatedAt}>{formatRelativeDate(review.updatedAt)}</time>
+      <ArrowRight size={16} className="row-arrow" />
+      <button
+        type="button"
+        aria-label={`Delete ${review.title}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onDelete(review.id);
+        }}
+        className="delete-review-button"
+      >
+        <Trash size={14} />
+      </button>
+    </div>
+  );
+}
+
+function TypeBreakdownRow({
+  type,
+  count,
+  total,
+  index,
+}: {
+  type: string;
+  count: number;
+  total: number;
+  index: number;
+}) {
+  const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+
+  return (
+    <div className="portfolio-row">
+      <div className="portfolio-label">
+        <span className={`portfolio-dot portfolio-dot-${(index % 4) + 1}`} />
+        <span>{TYPE_LABELS[type] ?? toTitleCase(type)}</span>
+        <strong>{count}</strong>
+      </div>
+      <div className="portfolio-bar">
+        <span
+          className={`portfolio-fill portfolio-fill-${(index % 4) + 1}`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function getPhaseProgress(phase: string) {
+  const index = PHASES.findIndex((item) => item.value === phase);
+  if (index < 0) return 8;
+  return Math.round(((index + 1) / PHASES.length) * 100);
+}
+
+function toTitleCase(value: string) {
+  return value
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatRelativeDate(value: string) {
+  const date = new Date(value);
+  const difference = Date.now() - date.getTime();
+  const day = 24 * 60 * 60 * 1000;
+
+  if (!Number.isFinite(difference) || difference < 0) return date.toLocaleDateString();
+  if (difference < day) return "Today";
+  if (difference < 2 * day) return "Yesterday";
+  if (difference < 7 * day) return `${Math.floor(difference / day)} days ago`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useReviewStore } from "@/lib/project/state";
 import { STUDY_DESIGNS, type Study } from "@/lib/types";
+import type { StudyImportKind, StudyImportResult } from "@/lib/study-import";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +59,12 @@ import {
   FileText,
   Microscope,
   MoreHorizontal,
+  FileUp,
+  Link2,
+  Hash,
+  Loader2,
+  Search,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -129,6 +136,201 @@ function initFormFromStudy(study: Study | null): StudyFormState {
   };
 }
 
+function SmartStudyImport({
+  onApply,
+}: {
+  onApply: (result: StudyImportResult) => void;
+}) {
+  const [mode, setMode] = useState<StudyImportKind>("pdf");
+  const [value, setValue] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<StudyImportResult | null>(null);
+
+  const modes: {
+    value: StudyImportKind;
+    label: string;
+    description: string;
+    icon: React.ElementType;
+  }[] = [
+    { value: "pdf", label: "PDF file", description: "Choose the paper", icon: FileUp },
+    { value: "doi", label: "DOI", description: "Enter its DOI", icon: Hash },
+    { value: "url", label: "Web link", description: "Paste the article link", icon: Link2 },
+  ];
+
+  function chooseMode(next: StudyImportKind) {
+    setMode(next);
+    setError("");
+    setResult(null);
+  }
+
+  async function importStudy(file?: File) {
+    setError("");
+    setResult(null);
+
+    if (mode === "pdf" && !file) {
+      setError("Choose a PDF file first.");
+      return;
+    }
+    if (mode !== "pdf" && !value.trim()) {
+      setError(mode === "doi" ? "Enter a DOI first." : "Paste a webpage link first.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let response: Response;
+      if (mode === "pdf" && file) {
+        const body = new FormData();
+        body.set("file", file);
+        response = await fetch("/api/studies/parse", { method: "POST", body });
+      } else {
+        response = await fetch("/api/studies/parse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source: mode, value: value.trim() }),
+        });
+      }
+
+      const payload = (await response.json()) as StudyImportResult & { error?: string };
+      if (!response.ok) throw new Error(payload.error || "We could not read that study.");
+
+      setResult(payload);
+      onApply(payload);
+      toast.success("Study details found", {
+        description: "Check the filled fields, then add the study.",
+      });
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : "We could not read that study.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-border bg-muted/20 p-3">
+      <div className="mb-3 flex items-start gap-2.5">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300">
+          <Search className="size-4" />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold">Quick add</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Give RevKit the paper and we will fill in the study details.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Study source">
+        {modes.map((item) => {
+          const Icon = item.icon;
+          const active = mode === item.value;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => chooseMode(item.value)}
+              className={`min-w-0 rounded-md border p-2 text-left transition-colors ${
+                active
+                  ? "border-teal-500 bg-teal-50 text-teal-950 dark:bg-teal-950/60 dark:text-teal-50"
+                  : "border-border bg-background/70 text-muted-foreground hover:bg-muted/60"
+              }`}
+            >
+              <Icon className="mb-1 size-4" />
+              <span className="block truncate text-xs font-semibold">{item.label}</span>
+              <span className="mt-0.5 hidden truncate text-[10px] opacity-70 sm:block">
+                {item.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-3">
+        {mode === "pdf" ? (
+          <div>
+            <input
+              id="smart-study-pdf"
+              type="file"
+              accept="application/pdf,.pdf"
+              className="sr-only"
+              disabled={loading}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                setFileName(file.name);
+                void importStudy(file);
+                event.target.value = "";
+              }}
+            />
+            <label
+              htmlFor="smart-study-pdf"
+              className={`flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed px-3 text-xs font-medium transition-colors ${
+                loading
+                  ? "cursor-wait border-teal-400 bg-teal-50/60 text-teal-800 dark:bg-teal-950/30 dark:text-teal-200"
+                  : "border-border bg-background/60 text-foreground hover:border-teal-500 hover:bg-teal-50/50 dark:hover:bg-teal-950/30"
+              }`}
+            >
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <FileUp className="size-4 text-teal-600" />}
+              <span className="truncate">{loading ? "Reading the PDF..." : fileName || "Choose a PDF"}</span>
+            </label>
+            <p className="mt-1.5 text-[10px] text-muted-foreground">
+              Up to 15 MB. The file is read temporarily and is not saved.
+            </p>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void importStudy();
+                }
+              }}
+              placeholder={mode === "doi" ? "10.1000/example" : "https://journal.org/article"}
+              aria-label={mode === "doi" ? "Study DOI" : "Study webpage link"}
+              disabled={loading}
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void importStudy()}
+              disabled={loading || !value.trim()}
+              className="h-9 shrink-0 bg-teal-600 px-3 text-white hover:bg-teal-700"
+            >
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+              Find details
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div role="alert" className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+          {error}
+        </div>
+      )}
+
+      {result && (
+        <div className="mt-2 flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+          <div>
+            <div className="font-semibold">Details filled in below</div>
+            <div className="mt-0.5 opacity-80">
+              {result.warnings[0] || "Please check them before adding the study."}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function StudyFormDialog({
   open,
   study,
@@ -151,6 +353,22 @@ function StudyFormDialog({
 
   function update<K extends keyof StudyFormState>(key: K, value: StudyFormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function applyImport(result: StudyImportResult) {
+    const suggestion = result.suggestion;
+    setForm((current) => ({
+      ...current,
+      label: suggestion.label || current.label,
+      year: suggestion.year != null ? String(suggestion.year) : current.year,
+      authors: suggestion.authors || current.authors,
+      doi: suggestion.doi || current.doi,
+      design: STUDY_DESIGNS.includes(suggestion.design) ? suggestion.design : current.design,
+      indexTest: suggestion.indexTest || current.indexTest,
+      referenceStandard: suggestion.referenceStandard || current.referenceStandard,
+      notes: suggestion.notes || current.notes,
+    }));
+    setErrors({});
   }
 
   function validate(): boolean {
@@ -202,7 +420,7 @@ function StudyFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => (o ? null : onClose())}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isEdit ? <Pencil className="size-4" /> : <Plus className="size-4" />}
@@ -210,16 +428,29 @@ function StudyFormDialog({
           </DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Update the study metadata. Changes are saved to the in-memory review."
-              : "Create a new study record. You can add data points and RoB assessments later."}
+              ? "Update the details for this study."
+              : "Upload a PDF, enter a DOI, or paste a link. RevKit will fill in what it can."}
           </DialogDescription>
         </DialogHeader>
+
+        {!isEdit && (
+          <>
+            <SmartStudyImport onApply={applyImport} />
+            <div className="flex items-center gap-3" aria-hidden="true">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                Check the details
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+          </>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="study-label">
-                Label <span className="text-destructive">*</span>
+                Study name <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="study-label"
@@ -249,16 +480,16 @@ function StudyFormDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="study-design">Design</Label>
+              <Label htmlFor="study-design">Study type</Label>
               <Select
                 value={form.design || "__none__"}
                 onValueChange={(v) => update("design", v === "__none__" ? "" : v)}
               >
                 <SelectTrigger id="study-design" className="w-full">
-                  <SelectValue placeholder="Select design" />
+                  <SelectValue placeholder="Choose a study type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">(unspecified)</SelectItem>
+                  <SelectItem value="__none__">Not sure yet</SelectItem>
                   {STUDY_DESIGNS.map((d) => (
                     <SelectItem key={d} value={d}>
                       {d}
@@ -289,7 +520,7 @@ function StudyFormDialog({
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="study-status">Status</Label>
+              <Label htmlFor="study-status">Review decision</Label>
               <Select
                 value={form.status}
                 onValueChange={(v) => update("status", v)}
@@ -298,9 +529,9 @@ function StudyFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="included">Included</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="excluded">Excluded</SelectItem>
+                  <SelectItem value="included">Include this study</SelectItem>
+                  <SelectItem value="pending">Decide later</SelectItem>
+                  <SelectItem value="excluded">Exclude this study</SelectItem>
                 </SelectContent>
               </Select>
             </div>
