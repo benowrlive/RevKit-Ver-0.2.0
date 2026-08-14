@@ -252,6 +252,10 @@ export interface PicoFieldDef {
   placeholder: string;
   /** Source list for the autocomplete dropdown. */
   suggestionsFrom?: string[];
+  /** Plain-language helper shown beside the field. */
+  help?: string;
+  /** Concrete example shown in the helper. */
+  example?: string;
   /** Required for the format to compose a valid title. */
   required?: boolean;
 }
@@ -376,26 +380,58 @@ export const PICO_TITLE_FORMATS: PicoTitleFormat[] = [
   },
   {
     id: "test_for_condition",
-    label: "Test for condition (DTA)",
-    description: "Diagnostic test accuracy review.",
+    label: "Diagnostic question (PIRD)",
+    description: "Population, index test, reference standard, and target condition.",
     fields: [
       {
-        key: "test",
-        label: "Index test",
+        key: "population",
+        label: "Population",
         conjunctionBefore: "",
-        placeholder: "e.g. rapid antigen test",
+        placeholder: "e.g. adults with suspected sepsis",
+        suggestionsFrom: COMMON_POPULATIONS,
+        help: "Who will receive the test? Include age group, pregnancy status, setting, and suspected condition when relevant.",
+        example: "adults with suspected sepsis",
+        required: true,
+      },
+      {
+        key: "test",
+        label: "Index test(s)",
+        conjunctionBefore: "",
+        placeholder: "e.g. clinical scores and point-of-care tests",
+        help: "Name the test, sign, score, biomarker, or group of tests being evaluated.",
+        example: "procalcitonin and bedside sepsis scores",
+        required: true,
+      },
+      {
+        key: "referenceStandard",
+        label: "Reference standard",
+        conjunctionBefore: "",
+        placeholder: "e.g. blood culture",
+        help: "What method will classify whether the target condition is present or absent?",
+        example: "blood culture or a pre-specified consensus definition",
         required: true,
       },
       {
         key: "condition",
-        label: "Condition",
-        conjunctionBefore: "for",
-        placeholder: "e.g. uncomplicated P. falciparum malaria",
+        label: "Target condition",
+        conjunctionBefore: "",
+        placeholder: "e.g. sepsis",
         suggestionsFrom: COMMON_CONDITIONS,
+        help: "State the condition the index test is intended to identify.",
+        example: "sepsis",
         required: true,
       },
     ],
-    compose: (v) => composeFielded(PICO_TITLE_FORMATS[3].fields, v),
+    compose: (v) => {
+      const test = v.test?.trim();
+      const condition = v.condition?.trim();
+      if (!test || !condition) return "";
+      const population = v.population?.trim();
+      const reference = v.referenceStandard?.trim();
+      return `Diagnostic accuracy of ${test} for ${condition}` +
+        (population ? ` in ${population}` : "") +
+        (reference ? ` using ${reference} as the reference standard` : "");
+    },
     appliesTo: ["DTA"],
   },
   {
@@ -478,8 +514,10 @@ export const SAMPLE_PICO: Record<ReviewType, Record<string, string>> = {
     population: "adults with prior myocardial infarction",
   },
   DTA: {
-    test: "rapid diagnostic test",
-    condition: "uncomplicated P. falciparum malaria",
+    population: "people with suspected sepsis",
+    test: "clinical scores and point-of-care tests",
+    referenceStandard: "blood culture",
+    condition: "sepsis",
   },
   METHODOLOGY: {
     topic: "adherence to CONSORT reporting",

@@ -26,6 +26,7 @@ model Review {
   references        Reference[]
   robAssessments    RobAssessment[]
   quadas3Workspace  Quadas3Workspace?
+  protocolWorkspace ProtocolWorkspace?
   prismaFlow        PrismaFlow?
 }
 
@@ -145,6 +146,13 @@ model RobAssessment {
 }
 
 model Quadas3Workspace {
+  reviewId  String @id
+  payload   String
+  updatedAt String
+  review    Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+model ProtocolWorkspace {
   reviewId  String @id
   payload   String
   updatedAt String

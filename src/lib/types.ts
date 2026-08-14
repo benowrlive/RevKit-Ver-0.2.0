@@ -248,6 +248,54 @@ export interface Quadas3Workspace {
   updatedAt: string;
 }
 
+export type ProsperoFieldId =
+  | "condition"
+  | "rationale"
+  | "objective"
+  | "keywords"
+  | "country"
+  | "populationIncluded"
+  | "populationExcluded"
+  | "indexTests"
+  | "referenceStandards"
+  | "studyDesignIncluded"
+  | "studyDesignExcluded"
+  | "context"
+  | "databases"
+  | "searchLimits"
+  | "otherSources"
+  | "selectionProcess"
+  | "extractionProcess"
+  | "riskOfBiasTool"
+  | "reportingBias"
+  | "certaintyAssessment"
+  | "mainOutcomes"
+  | "additionalOutcomes"
+  | "synthesisPlan"
+  | "timeline"
+  | "protocolAvailability"
+  | "reviewStage"
+  | "teamMembers"
+  | "affiliationFunding"
+  | "peerReviewConflicts"
+  | "meshTerms"
+  | "similarReviews";
+
+export interface DtaProtocolQuestion {
+  id: string;
+  population: string;
+  referenceStandard: string;
+  notes: string;
+}
+
+export interface ProtocolWorkspace {
+  version: "1.0";
+  framework: "PICO" | "PIRD";
+  answers: Partial<Record<ProsperoFieldId, string>>;
+  dtaQuestions: DtaProtocolQuestion[];
+  updatedAt: string;
+}
+
 export interface PrismaFlowBox {
   id: string;
   label: string;
@@ -275,6 +323,7 @@ export interface Review {
   references: Reference[];
   robAssessments: RobAssessment[];
   quadas3?: Quadas3Workspace | null;
+  protocol?: ProtocolWorkspace | null;
   prismaFlow?: PrismaFlow | null;
 }
 

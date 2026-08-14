@@ -71,12 +71,12 @@ export function PicoTitleBuilder({
       {/* ─── Format picker ────────────────────────────────────────────── */}
       <div className="space-y-2">
         <div className="flex items-center gap-1.5">
-          <label className="text-sm font-medium">Title format</label>
+          <label className="text-sm font-medium">Question structure</label>
           <InfoTooltip
-            title="Title format"
-            what="Pick a structured PICO format for the review title."
-            why="Structured titles are machine-parseable, shareable, and consistent across Cochrane reviews."
-            example="Aspirin for secondary prevention of cardiovascular events"
+            title="Question structure"
+            what={reviewType === "DTA" ? "Use PIRD: Population, Index test, Reference standard, and target Diagnosis." : "Use a structured PICO format for the review title and question."}
+            why="A structured question keeps eligibility, extraction, and registration language consistent."
+            example={reviewType === "DTA" ? "Adults · procalcitonin · blood culture · sepsis" : "Aspirin for secondary prevention of cardiovascular events"}
             side="right"
           />
         </div>
@@ -117,7 +117,7 @@ export function PicoTitleBuilder({
 
       {/* ─── Structured fields ───────────────────────────────────────── */}
       <div className="space-y-2.5">
-        <div className="eyebrow">Structured fields</div>
+        <div className="eyebrow">{reviewType === "DTA" ? "PIRD fields" : "PICO fields"}</div>
         <div className="space-y-2">
           {activeFormat.fields.map((field) => {
             const fieldValue = values[field.key] ?? "";
@@ -136,13 +136,23 @@ export function PicoTitleBuilder({
                   </span>
                 )}
                 <div className="flex-1 min-w-0">
-                  <label
-                    htmlFor={`pico-${field.key}`}
-                    className="text-[10px] uppercase tracking-wider text-muted-fg font-semibold block mb-0.5"
-                  >
-                    {field.label}
-                    {field.required && <span className="text-destructive ml-0.5">*</span>}
-                  </label>
+                  <div className="mb-0.5 flex items-center gap-1.5">
+                    <label
+                      htmlFor={`pico-${field.key}`}
+                      className="text-[10px] uppercase tracking-wider text-muted-fg font-semibold"
+                    >
+                      {field.label}
+                      {field.required && <span className="text-destructive ml-0.5">*</span>}
+                    </label>
+                    {field.help && (
+                      <InfoTooltip
+                        title={field.label}
+                        what={field.help}
+                        why="A precise answer creates a clearer title and protocol question."
+                        example={field.example ?? field.placeholder}
+                      />
+                    )}
+                  </div>
                   <ComboboxInput
                     id={`pico-${field.key}`}
                     value={fieldValue}

@@ -39,6 +39,7 @@ interface Props {
     type: ReviewType;
     subType: ReviewSubType;
     researchQuestion: string;
+    picoValues: Record<string, string>;
   }) => void;
   onOpen: (id: string) => void;
   onLoadExample: (type: ReviewType) => void;
@@ -336,8 +337,9 @@ export function WelcomeScreen({ onNew, onOpen, onLoadExample, refreshKey }: Prop
           onNew({
             title: input.title,
             type: input.type,
-            subType: null,
+            subType: input.subType,
             researchQuestion: input.researchQuestion,
+            picoValues: input.picoValues,
           });
         }}
       />

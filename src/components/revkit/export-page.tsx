@@ -25,6 +25,7 @@ import {
   Settings,
   Info,
   Loader2,
+  ClipboardCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,6 +49,7 @@ import { effectMeasureLabel } from "@/components/forest-plot/pooling";
 import { downloadText, slugify } from "@/lib/export/download";
 import { buildCombinedCsv } from "@/lib/export/csv";
 import { exportReviewAsDoc } from "@/lib/export/docx";
+import { exportProsperoDraft } from "@/lib/protocol/prospero";
 
 /** Flatten the review into a list of (comparison, outcome) pairs. */
 function listAllOutcomes(
@@ -148,6 +150,42 @@ function WordCard({ review }: { review: Review }) {
             <Download className="size-4" />
           )}
           Export to Word
+        </Button>
+      </div>
+    </ExportCard>
+  );
+}
+
+function ProtocolCard({ review }: { review: Review }) {
+  const ready = Boolean(review.protocol);
+  const handleExport = () => {
+    try {
+      exportProsperoDraft(review);
+      toast.success("Exported PROSPERO preparation draft", {
+        description: `${slugify(review.title)}-prospero-draft.doc`,
+      });
+    } catch (error) {
+      toast.error("Export failed", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  };
+
+  return (
+    <ExportCard
+      icon={<ClipboardCheck className="size-5 text-violet-700" />}
+      iconBg="#ede9fe"
+      title="Protocol / PROSPERO draft"
+      description="An editable question-by-question working document with PICO/PIRD, eligibility, methods, administration, and planned DTA strata."
+      footer={<div className="pt-3 text-xs text-muted-foreground">.doc · Word-compatible · review before submission</div>}
+    >
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Complete or update the answers in the Protocol workspace, then use this draft while entering the live registration form.
+        </p>
+        <Button onClick={handleExport} disabled={!ready} className="w-full bg-violet-600 text-white hover:bg-violet-700">
+          <Download className="size-4" />
+          {ready ? "Download protocol draft" : "Start the protocol first"}
         </Button>
       </div>
     </ExportCard>
@@ -381,6 +419,7 @@ export function ExportPage() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <WordCard review={review} />
+        <ProtocolCard review={review} />
         <CsvCard review={review} />
         <PlotCard review={review} />
       </div>

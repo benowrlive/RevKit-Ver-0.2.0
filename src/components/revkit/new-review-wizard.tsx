@@ -66,6 +66,7 @@ interface Props {
     type: ReviewType;
     subType: ReviewSubType;
     researchQuestion: string;
+    picoValues: Record<string, string>;
   }) => void;
 }
 
@@ -81,13 +82,13 @@ const TYPE_ICONS: Record<ReviewType, React.ElementType> = {
 const STEP_EYEBROWS = [
   "STEP 1 OF 4 · CHOOSE TYPE",
   "STEP 2 OF 4 · SUB-TYPE",
-  "STEP 3 OF 4 · PICO TITLE",
+  "STEP 3 OF 4 · REVIEW QUESTION",
   "STEP 4 OF 4 · CONFIRM",
 ];
 const STEP_LABELS = [
   "Choose review type",
   "Sub-type (optional)",
-  "Build the review title",
+  "Build the review question",
   "Confirm and create",
 ];
 // Apple-style ease (Emil Kowalski's --ease-out value).
@@ -115,18 +116,13 @@ export function NewReviewWizard({ open, onClose, onCreate }: Props) {
     }
   }, [open]);
 
-  // When the user picks a review type, set the default PICO format + seed sample values.
+  // When the user picks a review type, set the default question format.
   useEffect(() => {
     if (!type) return;
     const defaultFormat = defaultFormatForType(type);
     setFormatId(defaultFormat.id);
-    // Pre-fill with sample values so the preview shows a realistic title immediately.
-    const sample = SAMPLE_PICO[type] ?? {};
-    const seeded: Record<string, string> = {};
-    for (const f of defaultFormat.fields) {
-      seeded[f.key] = sample[f.key] ?? "";
-    }
-    setPicoValues(seeded);
+    // Start blank. Examples stay as placeholders so they are never mistaken for user data.
+    setPicoValues(Object.fromEntries(defaultFormat.fields.map((field) => [field.key, ""])));
     // Reset the research question — it'll be auto-composed on step 3.
     setRq("");
   }, [type]);
@@ -147,6 +143,15 @@ export function NewReviewWizard({ open, onClose, onCreate }: Props) {
     return active.compose(picoValues).trim();
   }
 
+  function questionFieldsComplete(): boolean {
+    if (!type) return false;
+    const formats = formatsForType(type);
+    const active = formats.find((format) => format.id === formatId) ?? formats[0];
+    return Boolean(active) && active.fields
+      .filter((field) => field.required)
+      .every((field) => Boolean(picoValues[field.key]?.trim()));
+  }
+
   // Auto-compose a draft research question from the PICO fields.
   function autoComposeRq(): string {
     if (!type) return "";
@@ -154,8 +159,10 @@ export function NewReviewWizard({ open, onClose, onCreate }: Props) {
     const v = { ...sample, ...picoValues };
     if (type === "DTA") {
       const test = v.test || "the index test";
-      const condition = v.condition || "the condition";
-      return `How accurate is ${test} for diagnosing ${condition}?`;
+      const condition = v.condition || "the target condition";
+      const population = v.population || "the target population";
+      const reference = v.referenceStandard || "the reference standard";
+      return `In ${population}, how accurately does ${test} identify ${condition} compared with ${reference}?`;
     }
     if (type === "METHODOLOGY") {
       return `What is the methodological quality of ${v.topic || "the topic"}?`;
@@ -184,6 +191,7 @@ export function NewReviewWizard({ open, onClose, onCreate }: Props) {
       type,
       subType,
       researchQuestion: finalRq,
+      picoValues,
     });
   }
 
@@ -191,7 +199,7 @@ export function NewReviewWizard({ open, onClose, onCreate }: Props) {
   const stepValid: boolean[] = [
     Boolean(type), // Step 0: type picked
     true, // Step 1: sub-type always optional
-    composedTitle().length > 0, // Step 2: title composed
+    questionFieldsComplete(), // Step 2: all required PICO/PIRD fields completed
     true, // Step 3: confirm
   ];
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { WelcomeScreen } from "@/components/revkit/welcome-screen";
 import { WorkspaceShell, OverviewPage, type WorkspaceTab } from "@/components/revkit/workspace-shell";
 import { StudiesPage } from "@/components/revkit/studies-page";
+import { ProtocolPage } from "@/components/revkit/protocol-page";
 import { ReferencesPage } from "@/components/revkit/references-page";
 import { ComparisonsPage } from "@/components/revkit/comparisons-page";
 import { RobPage } from "@/components/revkit/rob-page";
@@ -61,6 +62,7 @@ export default function Home() {
     type: ReviewType;
     subType: ReviewSubType;
     researchQuestion: string;
+    picoValues: Record<string, string>;
   }) {
     newReviewAction(input);
     setView("workspace");
@@ -133,6 +135,7 @@ export default function Home() {
   return (
     <WorkspaceShell active={tab} onTabChange={setTab} onExit={handleExit}>
       {tab === "overview" && <OverviewPage />}
+      {tab === "protocol" && <ProtocolPage />}
       {tab === "studies" && <StudiesPage />}
       {tab === "references" && <ReferencesPage />}
       {tab === "comparisons" && <ComparisonsPage />}

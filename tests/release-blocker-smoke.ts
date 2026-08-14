@@ -27,6 +27,8 @@ import {
 import { riskDifference } from "@/lib/stats/effect";
 import { calculateDta } from "@/lib/dta/calculate";
 import { quadas3OverallJudgement } from "@/lib/quadas3/config";
+import { buildDtaQuestion, buildProsperoDraftHtml, createProtocolWorkspace, createSepsisDtaTemplate } from "@/lib/protocol/prospero";
+import type { Review } from "@/lib/types";
 
 // ─── Tiny test harness ───────────────────────────────────────────────────────
 
@@ -308,6 +310,32 @@ function testQuadas3OverallJudgements(): void {
   );
 }
 
+// ─── Protocol builder: multi-population DTA matrix ──────────────────────────
+
+function testSepsisProtocolTemplate(): void {
+  const base = createProtocolWorkspace({
+    title: "Diagnostic tests for sepsis",
+    type: "DTA",
+    researchQuestion: "How accurately do point-of-care tests identify sepsis?",
+  });
+  const template = createSepsisDtaTemplate(base);
+  assert(template.dtaQuestions.length === 7, "Protocol: sepsis template creates the seven requested strata");
+  const pairs = new Set(template.dtaQuestions.map((question) => `${question.population}|${question.referenceStandard}`));
+  assert(pairs.size === 7, "Protocol: every population/reference-standard pair is unique");
+  const neonateQuestions = template.dtaQuestions.filter((question) => question.population.startsWith("neonates"));
+  assert(neonateQuestions.length === 1 && neonateQuestions[0].referenceStandard === "blood culture", "Protocol: neonates use the requested blood-culture stratum only");
+  assert(buildDtaQuestion(template.dtaQuestions[0], template).includes("compared with blood culture"), "Protocol: generated PIRD question names the reference standard");
+  const review = {
+    id: "rev_protocol_test", title: "Diagnostic tests for sepsis", type: "DTA", subType: null,
+    researchQuestion: "How accurately do point-of-care tests identify sepsis?", status: "draft", phase: "scoping",
+    createdAt: new Date(0).toISOString(), updatedAt: new Date(0).toISOString(), comparisons: [], studies: [],
+    references: [], robAssessments: [], quadas3: null, protocol: template, prismaFlow: null,
+  } as Review;
+  const html = buildProsperoDraftHtml(review);
+  assert(template.dtaQuestions.every((question) => html.includes(question.population)), "Protocol export: Word draft includes all seven populations");
+  assert(html.includes("working document helps prepare a registration"), "Protocol export: Word draft includes the submission disclaimer");
+}
+
 // ─── Run all tests ────────────────────────────────────────────────────────────
 
 function main(): void {
@@ -344,6 +372,9 @@ function main(): void {
 
   console.log("\nQUADAS-3: overall judgment rules (3 assertions)");
   testQuadas3OverallJudgements();
+
+  console.log("\nProtocol builder: multi-population DTA matrix (6 assertions)");
+  testSepsisProtocolTemplate();
 
   console.log("\n================================================");
   console.log(`Result: ${passed} passed, ${failed} failed`);

@@ -14,6 +14,7 @@ import type {
   Reference,
   RobAssessment,
   Quadas3Workspace,
+  ProtocolWorkspace,
   Review,
   ReviewPhase,
   ReviewType,
@@ -21,6 +22,7 @@ import type {
   DataPoint,
 } from "@/lib/types";
 import { newId } from "@/lib/project/id";
+import { createProtocolWorkspace } from "@/lib/protocol/prospero";
 
 export type ToastFn = (msg: string, opts?: { description?: string; variant?: "default" | "destructive" }) => void;
 
@@ -35,7 +37,7 @@ interface ReviewState {
 
   // Mutations — review-level
   setReview: (r: Review | null) => void;
-  newReview: (input: { title: string; type: ReviewType; subType: Review["subType"]; researchQuestion?: string | null }) => Review;
+  newReview: (input: { title: string; type: ReviewType; subType: Review["subType"]; researchQuestion?: string | null; picoValues?: Record<string, string> }) => Review;
   markDirty: () => void;
   markSaved: (dbId: string) => void;
   setSaving: (s: boolean) => void;
@@ -77,6 +79,7 @@ interface ReviewState {
   upsertRobAssessment: (a: Omit<RobAssessment, "id" | "createdAt" | "updatedAt"> & { id?: string }) => string;
   deleteRobAssessment: (id: string) => void;
   setQuadas3Workspace: (workspace: Quadas3Workspace) => void;
+  setProtocolWorkspace: (workspace: ProtocolWorkspace) => void;
 
   // PRISMA flow
   setPrismaBox: (boxId: string, count: number, autoCount?: boolean) => void;
@@ -109,6 +112,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       references: [],
       robAssessments: [],
       quadas3: null,
+      protocol: createProtocolWorkspace({ title: input.title, type: input.type, researchQuestion: input.researchQuestion }, input.picoValues),
       prismaFlow: null,
     };
     set({ review, isDirty: true, dbId: null });
@@ -612,6 +616,16 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       const now = new Date().toISOString();
       return {
         review: { ...s.review, quadas3: workspace, updatedAt: now },
+        isDirty: true,
+      };
+    }),
+
+  setProtocolWorkspace: (workspace) =>
+    set((s) => {
+      if (!s.review) return s;
+      const now = new Date().toISOString();
+      return {
+        review: { ...s.review, protocol: workspace, updatedAt: now },
         isDirty: true,
       };
     }),

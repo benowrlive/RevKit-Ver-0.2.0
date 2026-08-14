@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   CircleDot,
   Calculator,
+  ClipboardList,
 } from "lucide-react";
 import { useReviewStore } from "@/lib/project/state";
 import {
@@ -46,6 +47,7 @@ import { RevKitIcon } from "@/components/revkit/icons";
 
 export type WorkspaceTab =
   | "overview"
+  | "protocol"
   | "studies"
   | "references"
   | "comparisons"
@@ -66,6 +68,7 @@ interface Props {
 // stage — it's a tool, accessed from the topbar gear icon.
 const WORKFLOW_STAGES: { id: WorkspaceTab; label: string; short: string; icon: React.ElementType; badge?: (r: Review) => React.ReactNode }[] = [
   { id: "overview", label: "Overview", short: "Setup", icon: LayoutDashboard },
+  { id: "protocol", label: "Protocol", short: "Protocol", icon: ClipboardList },
   { id: "studies", label: "Studies", short: "Studies", icon: Users, badge: (r) => <span className="ml-auto text-[11px] tabular text-muted-fg">{r.studies.length}</span> },
   { id: "references", label: "Screening", short: "Screen", icon: FileText, badge: (r) => <span className="ml-auto text-[11px] tabular text-muted-fg">{r.references.length}</span> },
   { id: "comparisons", label: "Extraction & Analysis", short: "Extract", icon: GitCompare, badge: (r) => <span className="ml-auto text-[11px] tabular text-muted-fg">{r.comparisons.length}</span> },
@@ -77,12 +80,13 @@ const WORKFLOW_STAGES: { id: WorkspaceTab; label: string; short: string; icon: R
 // Map each tab to its position in the workflow (0-indexed). Settings is -1 (not a stage).
 const STAGE_INDEX: Record<WorkspaceTab, number> = {
   overview: 0,
-  studies: 1,
-  references: 2,
-  comparisons: 3,
-  rob: 4,
-  prisma: 5,
-  export: 6,
+  protocol: 1,
+  studies: 2,
+  references: 3,
+  comparisons: 4,
+  rob: 5,
+  prisma: 6,
+  export: 7,
   settings: -1,
 };
 

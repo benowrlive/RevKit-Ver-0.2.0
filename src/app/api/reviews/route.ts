@@ -59,6 +59,10 @@ export async function loadReviewTree(reviewRow: ReviewRow): Promise<Review> {
     where: { reviewId: reviewRow.id },
   });
 
+  const protocolWorkspace = await db.protocolWorkspace.findUnique({
+    where: { reviewId: reviewRow.id },
+  });
+
   const review: Review = {
     id: reviewRow.id,
     title: reviewRow.title,
@@ -152,6 +156,9 @@ export async function loadReviewTree(reviewRow: ReviewRow): Promise<Review> {
     ),
     quadas3: quadas3Workspace
       ? (JSON.parse(quadas3Workspace.payload) as NonNullable<Review["quadas3"]>)
+      : null,
+    protocol: protocolWorkspace
+      ? (JSON.parse(protocolWorkspace.payload) as NonNullable<Review["protocol"]>)
       : null,
     prismaFlow: prismaFlow
       ? {
@@ -266,6 +273,7 @@ export async function PUT(req: NextRequest) {
       db.prismaFlow.deleteMany({ where: { reviewId: id } }),
       db.robAssessment.deleteMany({ where: { reviewId: id } }),
       db.quadas3Workspace.deleteMany({ where: { reviewId: id } }),
+      db.protocolWorkspace.deleteMany({ where: { reviewId: id } }),
     ]);
 
     await persistReviewTree(review);
@@ -383,7 +391,18 @@ async function persistReviewTree(review: Review) {
     });
   }
 
-  // 6) References.
+  // 6) Guided protocol and PROSPERO preparation workspace.
+  if (review.protocol) {
+    await db.protocolWorkspace.create({
+      data: {
+        reviewId: review.id,
+        payload: JSON.stringify(review.protocol),
+        updatedAt: review.protocol.updatedAt,
+      },
+    });
+  }
+
+  // 7) References.
   for (const r of review.references) {
     await db.reference.create({
       data: {
@@ -403,7 +422,7 @@ async function persistReviewTree(review: Review) {
     });
   }
 
-  // 7) PRISMA flow.
+  // 8) PRISMA flow.
   if (review.prismaFlow) {
     await db.prismaFlow.create({
       data: {
