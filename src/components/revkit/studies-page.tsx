@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useReviewStore } from "@/lib/project/state";
 import { STUDY_DESIGNS, type Study } from "@/lib/types";
 import type { StudyImportKind, StudyImportResult } from "@/lib/study-import";
+import { deleteStudyPdf, saveStudyPdf } from "@/lib/pdf-library";
+import { StudyReader } from "@/components/revkit/study-reader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +67,8 @@ import {
   Loader2,
   Search,
   CheckCircle2,
+  BookOpen,
+  Paperclip,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -138,8 +142,10 @@ function initFormFromStudy(study: Study | null): StudyFormState {
 
 function SmartStudyImport({
   onApply,
+  onPdfSelected,
 }: {
   onApply: (result: StudyImportResult) => void;
+  onPdfSelected: (file: File) => void;
 }) {
   const [mode, setMode] = useState<StudyImportKind>("pdf");
   const [value, setValue] = useState("");
@@ -262,6 +268,7 @@ function SmartStudyImport({
                 const file = event.target.files?.[0];
                 if (!file) return;
                 setFileName(file.name);
+                onPdfSelected(file);
                 void importStudy(file);
                 event.target.value = "";
               }}
@@ -278,7 +285,7 @@ function SmartStudyImport({
               <span className="truncate">{loading ? "Reading the PDF..." : fileName || "Choose a PDF"}</span>
             </label>
             <p className="mt-1.5 text-[10px] text-muted-foreground">
-              Up to 15 MB. The file is read temporarily and is not saved.
+              Up to 15 MB. The PDF will stay attached to this study on this device.
             </p>
           </div>
         ) : (
@@ -350,6 +357,7 @@ function StudyFormDialog({
   // the form state is re-initialized via the useState initializer on each mount.
   const [form, setForm] = useState<StudyFormState>(() => initFormFromStudy(study));
   const [errors, setErrors] = useState<{ label?: string; year?: string }>({});
+  const [pendingPdf, setPendingPdf] = useState<File | null>(null);
 
   function update<K extends keyof StudyFormState>(key: K, value: StudyFormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -389,7 +397,7 @@ function StudyFormDialog({
     return Object.keys(next).length === 0;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
     const yearNum = form.year.trim() === "" ? null : Number(form.year);
@@ -408,12 +416,25 @@ function StudyFormDialog({
       notes: form.notes.trim() || null,
     };
 
+    let studyId: string;
     if (isEdit && study) {
       updateStudy(study.id, payload);
+      studyId = study.id;
       toast.success("Study updated", { description: payload.label });
     } else {
-      addStudy(payload);
+      studyId = addStudy(payload);
       toast.success("Study added", { description: payload.label });
+    }
+
+    if (pendingPdf && review) {
+      try {
+        const record = await saveStudyPdf(review.id, studyId, pendingPdf);
+        updateStudy(studyId, { pdfPath: record.key });
+      } catch (error) {
+        toast.error("Study added, but the PDF could not be saved", {
+          description: error instanceof Error ? error.message : "Browser storage is unavailable.",
+        });
+      }
     }
     onClose();
   }
@@ -435,7 +456,7 @@ function StudyFormDialog({
 
         {!isEdit && (
           <>
-            <SmartStudyImport onApply={applyImport} />
+            <SmartStudyImport onApply={applyImport} onPdfSelected={setPendingPdf} />
             <div className="flex items-center gap-3" aria-hidden="true">
               <div className="h-px flex-1 bg-border" />
               <span className="text-[10px] font-semibold uppercase text-muted-foreground">
@@ -601,13 +622,16 @@ function StudyFormDialog({
 export function StudiesPage() {
   const review = useReviewStore((s) => s.review);
   const deleteStudy = useReviewStore((s) => s.deleteStudy);
+  const updateStudy = useReviewStore((s) => s.updateStudy);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingStudy, setEditingStudy] = useState<Study | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [readingStudyId, setReadingStudyId] = useState<string | null>(null);
 
   if (!review) return null;
 
+  const reviewId = review.id;
   const studies = review.studies;
   const studyToDelete = studies.find((s) => s.id === deleteId) ?? null;
 
@@ -624,12 +648,48 @@ export function StudiesPage() {
     setEditingStudy(null);
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!deleteId) return;
     const label = studyToDelete?.label ?? "this study";
+    if (studyToDelete?.pdfPath) {
+      await deleteStudyPdf(studyToDelete.pdfPath).catch(() => undefined);
+    }
     deleteStudy(deleteId);
     setDeleteId(null);
     toast.success("Study deleted", { description: label });
+  }
+
+  async function attachPdf(study: Study, file: File) {
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      toast.error("Choose a PDF file");
+      return;
+    }
+    if (file.size > 250 * 1024 * 1024) {
+      toast.error("That PDF is too large", { description: "Choose a file smaller than 250 MB." });
+      return;
+    }
+    try {
+      const record = await saveStudyPdf(reviewId, study.id, file);
+      updateStudy(study.id, { pdfPath: record.key });
+      toast.success(study.pdfPath ? "PDF replaced" : "PDF attached", { description: file.name });
+      setReadingStudyId(study.id);
+    } catch (error) {
+      toast.error("PDF could not be saved", {
+        description: error instanceof Error ? error.message : "Browser storage is unavailable.",
+      });
+    }
+  }
+
+  const readingStudy = studies.find((study) => study.id === readingStudyId) ?? null;
+  if (readingStudy) {
+    return (
+      <StudyReader
+        study={readingStudy}
+        studies={studies}
+        onClose={() => setReadingStudyId(null)}
+        onSelectStudy={(study) => setReadingStudyId(study.id)}
+      />
+    );
   }
 
   return (
@@ -686,6 +746,7 @@ export function StudiesPage() {
                 <TableHead className="min-w-[140px] hidden md:table-cell">Design</TableHead>
                 <TableHead className="w-28">Status</TableHead>
                 <TableHead className="min-w-[160px] hidden lg:table-cell">DOI</TableHead>
+                <TableHead className="w-32">Full text</TableHead>
                 <TableHead className="w-10 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -733,6 +794,40 @@ export function StudiesPage() {
                       </a>
                     ) : (
                       <span className="text-xs text-muted-foreground/60">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <input
+                      id={"study-pdf-" + study.id}
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      className="sr-only"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) void attachPdf(study, file);
+                        event.target.value = "";
+                      }}
+                    />
+                    {study.pdfPath ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-teal-700 hover:text-teal-800 dark:text-teal-300"
+                        onClick={() => setReadingStudyId(study.id)}
+                      >
+                        <BookOpen className="size-3.5" />
+                        Read
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-muted-foreground"
+                        onClick={() => document.getElementById("study-pdf-" + study.id)?.click()}
+                      >
+                        <Paperclip className="size-3.5" />
+                        Attach PDF
+                      </Button>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -791,7 +886,7 @@ export function StudiesPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={() => void handleDelete()}
               className="bg-rose-600 hover:bg-rose-700 text-white"
             >
               <Trash2 className="size-4" />

@@ -167,7 +167,16 @@ export function WelcomeScreen({ onNew, onOpen, refreshKey }: Props) {
               <RevKitIcon className="size-8" />
               <span>RevKit</span>
             </button>
-            <div className="topbar-context">Your review workspace</div>
+            <div
+              className="topbar-evidence"
+              aria-label="Systematic reviews, meta-analysis, and evidence synthesis"
+            >
+              <span>Systematic reviews</span>
+              <i aria-hidden="true" />
+              <span>Meta-analysis</span>
+              <i aria-hidden="true" />
+              <span>Evidence synthesis</span>
+            </div>
             <div className="topbar-actions">
               <span className="topbar-version">v0.2.0</span>
               <ThemeToggle />
