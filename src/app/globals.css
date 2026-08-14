@@ -1619,32 +1619,70 @@
     display: none;
   }
   .dashboard-content {
-    padding: 16px 12px;
+    padding: 13px 12px 18px;
+  }
+  .dashboard-heading {
+    margin-bottom: 10px;
+  }
+  .dashboard-heading .eyebrow {
+    padding: 4px 8px;
+    font-size: 8px;
   }
   .dashboard-heading h1 {
-    font-size: 30px;
+    margin-top: 6px;
+    font-size: 28px;
   }
   .dashboard-heading p {
-    max-width: 340px;
-    font-size: 12px;
+    max-width: 320px;
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 1.45;
   }
   .dashboard-primary-cta {
     width: min(100%, 340px);
+    min-height: 48px;
+    margin-top: 10px;
   }
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: 6px;
+    margin-bottom: 8px;
   }
   .dashboard-metric.premium-metric {
-    min-height: 66px;
-    padding: 9px;
+    min-height: 58px;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 8px;
+    padding: 7px 8px;
+  }
+  .metric-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .metric-copy strong {
+    font-size: 18px;
   }
   .metric-copy span {
     font-size: 8px;
   }
+  .dashboard-grid {
+    gap: 8px;
+  }
+  .dashboard-library {
+    min-height: 190px;
+  }
+  .library-empty {
+    min-height: 138px;
+    padding: 14px;
+  }
+  .library-empty .empty-icon {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 8px;
+  }
   .dashboard-side-stack {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: repeat(2, minmax(150px, auto));
+    grid-template-rows: repeat(2, minmax(138px, auto));
+    gap: 8px;
   }
   .library-row.premium-review-row {
     min-height: 68px;
@@ -1685,7 +1723,11 @@
     font-size: 6.5px;
   }
   .dashboard-heading h1 {
-    font-size: 28px;
+    font-size: 26px;
+  }
+  .dashboard-heading p {
+    max-width: 292px;
+    font-size: 10.5px;
   }
 }
 
