@@ -69,7 +69,7 @@ const WORKFLOW_STAGES: { id: WorkspaceTab; label: string; short: string; icon: R
   { id: "studies", label: "Studies", short: "Studies", icon: Users, badge: (r) => <span className="ml-auto text-[11px] tabular text-muted-fg">{r.studies.length}</span> },
   { id: "references", label: "Screening", short: "Screen", icon: FileText, badge: (r) => <span className="ml-auto text-[11px] tabular text-muted-fg">{r.references.length}</span> },
   { id: "comparisons", label: "Extraction & Analysis", short: "Extract", icon: GitCompare, badge: (r) => <span className="ml-auto text-[11px] tabular text-muted-fg">{r.comparisons.length}</span> },
-  { id: "rob", label: "Risk of Bias", short: "RoB", icon: ShieldCheck, badge: (r) => <span className="ml-auto text-[11px] tabular text-muted-fg">{r.robAssessments.length}</span> },
+  { id: "rob", label: "Risk of Bias", short: "RoB", icon: ShieldCheck, badge: (r) => <span className="ml-auto text-[11px] tabular text-muted-fg">{r.robAssessments.length + (r.quadas3?.estimates.length ?? 0)}</span> },
   { id: "prisma", label: "PRISMA Flow", short: "PRISMA", icon: Network },
   { id: "export", label: "Export", short: "Export", icon: Download },
 ];
@@ -384,7 +384,7 @@ function OverviewBody({
         includedRef={includedRef}
         cmpCount={cmpCount}
         outcomeCount={outcomeCount}
-        robCount={review.robAssessments.length}
+        robCount={review.robAssessments.length + (review.quadas3?.estimates.length ?? 0)}
         phase={review.phase}
       />
 

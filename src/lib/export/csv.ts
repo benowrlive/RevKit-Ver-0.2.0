@@ -27,6 +27,7 @@ import type {
   Study,
 } from "@/lib/types";
 import { PRISMA_TEMPLATE } from "@/lib/prisma-flow/template";
+import { getEstimateJudgements } from "@/lib/quadas3/config";
 import { toCsv } from "./download";
 
 /** Studies table (header + 1 row per study). */
@@ -201,6 +202,36 @@ export function buildRobAssessmentsCsv(review: Review): Array<Array<string | num
   return rows;
 }
 
+/** QUADAS-3 estimate-level assessment table. */
+export function buildQuadas3Csv(review: Review): Array<Array<string | number | null>> {
+  const rows: Array<Array<string | number | null>> = [[
+    "studyId",
+    "studyLabel",
+    "question",
+    "estimate",
+    "numericalResult",
+    "overallRiskOfBias",
+    "overallApplicability",
+    "domainAssessments",
+  ]];
+  const workspace = review.quadas3;
+  if (!workspace) return rows;
+  for (const estimate of workspace.estimates) {
+    const overall = getEstimateJudgements(workspace.domainAssessments, estimate.id);
+    rows.push([
+      estimate.studyId,
+      review.studies.find((study) => study.id === estimate.studyId)?.label ?? "",
+      workspace.synthesisQuestions.find((question) => question.id === estimate.questionId)?.question ?? "",
+      estimate.label,
+      estimate.numericalResult,
+      overall.risk,
+      overall.applicability,
+      JSON.stringify(workspace.domainAssessments.filter((assessment) => assessment.estimateId === estimate.id)),
+    ]);
+  }
+  return rows;
+}
+
 /**
  * Build the PRISMA flow as a JSON string. Falls back to the canonical 11-box
  * template with 0 counts if the review has no flow yet.
@@ -233,6 +264,7 @@ export function buildCombinedCsv(review: Review): string {
     { name: "references", rows: buildReferencesCsv(review) },
     { name: "data-points", rows: buildDataPointsCsv(review) },
     { name: "rob-assessments", rows: buildRobAssessmentsCsv(review) },
+    { name: "quadas-3", rows: buildQuadas3Csv(review) },
   ];
 
   const lines: string[] = [];

@@ -15,6 +15,7 @@ import {
   REVIEW_PHASES,
 } from "@/lib/types";
 import { PRISMA_TEMPLATE } from "@/lib/prisma-flow/template";
+import { getEstimateJudgements } from "@/lib/quadas3/config";
 import {
   buildPerStudyEffects,
   effectMeasureLabel,
@@ -243,7 +244,7 @@ function buildResultsTableHtml(review: Review): string {
 /** Build the risk-of-bias summary table HTML. */
 function buildRobTableHtml(review: Review): string {
   if (review.robAssessments.length === 0) {
-    return `<p><em>No risk-of-bias assessments recorded.</em></p>`;
+    return `<p><em>No legacy study-level risk-of-bias assessments recorded.</em></p>`;
   }
   const studyLabelById = new Map(review.studies.map((s) => [s.id, s.label]));
   const rows = review.robAssessments.map((a) => {
@@ -262,6 +263,28 @@ function buildRobTableHtml(review: Review): string {
   });
   return `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">` +
     `<thead><tr style="background: #f1f5f9;"><th>Study</th><th>Tool</th><th>Overall judgement</th><th>Domain judgements</th></tr></thead>` +
+    `<tbody>${rows.join("")}</tbody></table>`;
+}
+
+/** Build the QUADAS-3 estimate-level summary table HTML. */
+function buildQuadas3TableHtml(review: Review): string {
+  const workspace = review.quadas3;
+  if (!workspace || workspace.estimates.length === 0) {
+    return `<p><em>No QUADAS-3 estimates recorded.</em></p>`;
+  }
+  const rows = workspace.estimates.map((estimate) => {
+    const study = review.studies.find((item) => item.id === estimate.studyId);
+    const question = workspace.synthesisQuestions.find((item) => item.id === estimate.questionId);
+    const overall = getEstimateJudgements(workspace.domainAssessments, estimate.id);
+    const domains = workspace.domainAssessments
+      .filter((item) => item.estimateId === estimate.id)
+      .map((item) => `${item.domainId}: ${item.riskJudgement.replace(/_/g, " ")}`)
+      .join("; ");
+    return `<tr><td>${escapeHtml(study?.label ?? estimate.studyId)}</td><td>${escapeHtml(estimate.label)}</td><td>${escapeHtml(question?.label ?? "")}</td><td>${escapeHtml(overall.risk.replace(/_/g, " "))}</td><td>${escapeHtml(overall.applicability.replace(/_/g, " "))}</td><td>${escapeHtml(domains)}</td></tr>`;
+  });
+  return `<h3>QUADAS-3 v${escapeHtml(workspace.version)}</h3>` +
+    `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">` +
+    `<thead><tr style="background: #f1f5f9;"><th>Study</th><th>Estimate</th><th>Synthesis question</th><th>Overall risk of bias</th><th>Applicability</th><th>Domains</th></tr></thead>` +
     `<tbody>${rows.join("")}</tbody></table>`;
 }
 
@@ -338,6 +361,7 @@ export function buildReviewHtml(review: Review): string {
 
   const robSection = `
     <h2 style="font-size: 18pt; border-bottom: 2px solid #cbd5e1; padding-bottom: 6pt;">Risk of Bias</h2>
+    ${review.quadas3 ? buildQuadas3TableHtml(review) : ""}
     ${buildRobTableHtml(review)}
   `;
 

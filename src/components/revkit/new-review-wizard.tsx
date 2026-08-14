@@ -236,7 +236,7 @@ export function NewReviewWizard({ open, onClose, onCreate }: Props) {
                     title="Review type"
                     what="Pick the Cochrane review type. Determines available RoB tools, default effect measures, and analysis methods."
                     why="Type locks in defaults that match Cochrane Handbook conventions."
-                    example="Intervention → RoB 2 + MH/OR; DTA → QUADAS-2 + logit pooling"
+                    example="Intervention → RoB 2 + MH/OR; DTA → QUADAS-3 + logit pooling"
                     side="right"
                   />
                 </div>
@@ -272,7 +272,8 @@ export function NewReviewWizard({ open, onClose, onCreate }: Props) {
                             <div className="flex flex-wrap gap-1 pt-1">
                               {t.usesRob2 && <span className="badge-tiny badge-neutral">RoB 2</span>}
                               {t.usesRobinsI && <span className="badge-tiny badge-neutral">ROBINS-I</span>}
-                              {t.usesQuadas2 && <span className="badge-tiny badge-neutral">QUADAS-2</span>}
+                              {t.usesQuadas3 && <span className="badge-tiny badge-neutral">QUADAS-3</span>}
+                              {t.usesLegacyQuadas2 && <span className="badge-tiny badge-neutral">QUADAS-2 legacy</span>}
                               {t.usesDta && <span className="badge-tiny badge-neutral">DTA</span>}
                             </div>
                           </div>

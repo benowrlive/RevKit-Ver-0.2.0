@@ -1,4 +1,5 @@
 import { newId } from "@/lib/project/id";
+import { createQuadas3Workspace } from "@/lib/quadas3/config";
 import type {
   Comparison,
   DataPoint,
@@ -7,6 +8,7 @@ import type {
   MethodType,
   ModelType,
   Outcome,
+  Quadas3Estimate,
   Reference,
   Review,
   ReviewSubType,
@@ -229,7 +231,7 @@ function interventionExample(): Review {
 }
 
 function dtaExample(): Review {
-  return makeReviewBase({
+  const review = makeReviewBase({
     type: "DTA",
     title: "Rapid antigen tests for influenza",
     researchQuestion: "How accurately do rapid antigen tests identify influenza in people with acute respiratory symptoms?",
@@ -256,8 +258,52 @@ function dtaExample(): Review {
       ],
     },
   });
-}
 
+  const workspace = createQuadas3Workspace(review.researchQuestion);
+  const question = workspace.synthesisQuestions[0];
+  question.population = "People presenting with acute respiratory symptoms";
+  question.indexTests = "Point-of-care rapid influenza antigen tests";
+  question.targetCondition = "Influenza confirmed by RT-PCR";
+  const estimates: Quadas3Estimate[] = review.studies.map((study, index) => ({
+    id: newId("q3est"),
+    studyId: study.id,
+    questionId: question.id,
+    label: "Primary manufacturer threshold",
+    numericalResult: ["Sensitivity 84%; specificity 91%", "Sensitivity 75%; specificity 93%", "Sensitivity 81%; specificity 90%", "Sensitivity 79%; specificity 95%"][index],
+    participants: "People with acute respiratory symptoms",
+    indexTest: "Rapid antigen test",
+    threshold: "Manufacturer-defined positive result",
+    targetCondition: "Laboratory-confirmed influenza",
+    referenceStandard: "RT-PCR",
+    unitOfAnalysis: "participant",
+    analysis: "Complete-case 2x2 table",
+    domains: ["D1", "D2", "D3", "D4"],
+  }));
+  return {
+    ...review,
+    quadas3: {
+      ...workspace,
+      idealTrials: [{
+        questionId: question.id,
+        objective: "Estimate sensitivity and specificity in intended point-of-care use",
+        participants: "Prospectively enrolled consecutive symptomatic patients",
+        indexTests: "Current rapid antigen test used according to manufacturer instructions",
+        targetCondition: "RT-PCR applied to all participants with blinded interpretation",
+        analysis: "All enrolled participants included using participant-level 2x2 data",
+      }],
+      studyFlows: review.studies.map((study, index) => ({
+        studyId: study.id,
+        enrolled: [300, 250, 400, 270][index],
+        receivedIndexTest: [300, 250, 400, 270][index],
+        receivedReferenceStandard: [300, 250, 400, 270][index],
+        includedInAnalysis: [300, 250, 400, 270][index],
+        exclusions: "None in the illustrative example",
+        notes: "Illustrative flow values only",
+      })),
+      estimates,
+    },
+  };
+}
 function methodologyExample(): Review {
   return makeReviewBase({
     type: "METHODOLOGY",

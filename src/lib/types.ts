@@ -170,6 +170,84 @@ export interface RobAssessment {
   updatedAt: string;
 }
 
+export type Quadas3Answer = "yes" | "py" | "pn" | "no" | "ni";
+export type Quadas3Judgement = "low" | "high" | "insufficient_information";
+export type Quadas3DomainId = "D1" | "D2" | "D3" | "D4";
+
+export interface Quadas3SynthesisQuestion {
+  id: string;
+  label: string;
+  question: string;
+  population: string;
+  indexTests: string;
+  targetCondition: string;
+}
+
+export interface Quadas3IdealTrial {
+  questionId: string;
+  objective: string;
+  participants: string;
+  indexTests: string;
+  targetCondition: string;
+  analysis: string;
+}
+
+export interface Quadas3StudyFlow {
+  studyId: string;
+  enrolled: number | null;
+  receivedIndexTest: number | null;
+  receivedReferenceStandard: number | null;
+  includedInAnalysis: number | null;
+  exclusions: string;
+  notes: string;
+}
+
+export interface Quadas3Estimate {
+  id: string;
+  studyId: string;
+  questionId: string;
+  label: string;
+  numericalResult: string;
+  participants: string;
+  indexTest: string;
+  threshold: string;
+  targetCondition: string;
+  referenceStandard: string;
+  unitOfAnalysis: string;
+  analysis: string;
+  domains: Quadas3DomainId[];
+}
+
+export interface Quadas3DomainAssessment {
+  estimateId: string;
+  domainId: Quadas3DomainId;
+  description: string;
+  answers: Record<string, Quadas3Answer>;
+  riskJudgement: Quadas3Judgement;
+  riskRationale: string;
+  applicabilityJudgement?: Quadas3Judgement;
+  applicabilityRationale?: string;
+}
+
+export interface Quadas3OverallJudgement {
+  estimateId: string;
+  riskJudgement: Quadas3Judgement;
+  riskRationale: string;
+  applicabilityJudgement: Quadas3Judgement;
+  applicabilityRationale: string;
+}
+
+export interface Quadas3Workspace {
+  version: "1.2";
+  synthesisQuestions: Quadas3SynthesisQuestion[];
+  idealTrials: Quadas3IdealTrial[];
+  studyFlows: Quadas3StudyFlow[];
+  estimates: Quadas3Estimate[];
+  domainAssessments: Quadas3DomainAssessment[];
+  overallJudgements: Quadas3OverallJudgement[];
+  updatedAt: string;
+}
+
 export interface PrismaFlowBox {
   id: string;
   label: string;
@@ -196,6 +274,7 @@ export interface Review {
   studies: Study[];
   references: Reference[];
   robAssessments: RobAssessment[];
+  quadas3?: Quadas3Workspace | null;
   prismaFlow?: PrismaFlow | null;
 }
 
@@ -214,7 +293,8 @@ export const REVIEW_TYPES: {
   description: string;
   usesRob2: boolean;
   usesRobinsI: boolean;
-  usesQuadas2: boolean;
+  usesQuadas3: boolean;
+  usesLegacyQuadas2: boolean;
   usesDta: boolean;
 }[] = [
   {
@@ -223,7 +303,8 @@ export const REVIEW_TYPES: {
     description: "Does X work for Y? Compare 2+ interventions.",
     usesRob2: true,
     usesRobinsI: true,
-    usesQuadas2: false,
+    usesQuadas3: false,
+    usesLegacyQuadas2: false,
     usesDta: false,
   },
   {
@@ -232,7 +313,8 @@ export const REVIEW_TYPES: {
     description: "How good is test X for disease Y?",
     usesRob2: false,
     usesRobinsI: false,
-    usesQuadas2: true,
+    usesQuadas3: true,
+    usesLegacyQuadas2: false,
     usesDta: true,
   },
   {
@@ -241,7 +323,8 @@ export const REVIEW_TYPES: {
     description: "How good is method X?",
     usesRob2: true,
     usesRobinsI: true,
-    usesQuadas2: false,
+    usesQuadas3: false,
+    usesLegacyQuadas2: false,
     usesDta: false,
   },
   {
@@ -250,7 +333,8 @@ export const REVIEW_TYPES: {
     description: "Summary of multiple existing reviews.",
     usesRob2: false,
     usesRobinsI: false,
-    usesQuadas2: false,
+    usesQuadas3: false,
+    usesLegacyQuadas2: false,
     usesDta: false,
   },
   {
@@ -259,7 +343,8 @@ export const REVIEW_TYPES: {
     description: "User-defined review structure.",
     usesRob2: true,
     usesRobinsI: true,
-    usesQuadas2: true,
+    usesQuadas3: true,
+    usesLegacyQuadas2: true,
     usesDta: false,
   },
 ];

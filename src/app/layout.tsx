@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   title: "RevKit",
   description:
     "Plan, manage, analyze, and export systematic reviews with RevKit.",
-  keywords: ["RevKit", "RevMan", "systematic review", "meta-analysis", "Cochrane", "PRISMA", "RoB 2", "ROBINS-I", "QUADAS-2"],
+  keywords: ["RevKit", "RevMan", "systematic review", "meta-analysis", "Cochrane", "PRISMA", "RoB 2", "ROBINS-I", "QUADAS-3", "QUADAS-2"],
   authors: [{ name: "RevKit Contributors" }],
   icons: {
     icon: "/r-logo.png",

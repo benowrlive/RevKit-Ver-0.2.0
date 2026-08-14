@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 import { useReviewStore } from "@/lib/project/state";
+import { Quadas3WorkspacePanel } from "@/components/revkit/quadas3-workspace";
 import type {
   RobAssessment,
   RobJudgement,
@@ -1053,6 +1054,7 @@ export function RobPage() {
   const [filter, setFilter] = useState<StudyFilter>("all");
   const [editorState, setEditorState] = useState<EditorState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RobAssessment | null>(null);
+  const [legacyOpen, setLegacyOpen] = useState(false);
 
   if (!review) return null;
 
@@ -1100,14 +1102,16 @@ export function RobPage() {
             Risk of Bias
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Assess included studies with RoB 2, ROBINS-I, or QUADAS-2. Per-study
-            answers drive live domain and overall judgements via each tool&apos;s
-            official algorithm.
+            {review.type === "DTA"
+              ? "Use QUADAS-3 for estimate-level risk of bias and applicability. QUADAS-2 remains available for older protocols."
+              : "Assess included studies with RoB 2 or ROBINS-I. Answers drive live domain and overall judgements."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary" className="h-7 px-2.5">
-            {assessedCount} of {studies.length} {studies.length === 1 ? "study" : "studies"} assessed
+            {review.type === "DTA"
+              ? `${review.quadas3?.estimates.length ?? 0} selected ${(review.quadas3?.estimates.length ?? 0) === 1 ? "estimate" : "estimates"}`
+              : `${assessedCount} of ${studies.length} ${studies.length === 1 ? "study" : "studies"} assessed`}
           </Badge>
           <Select value={filter} onValueChange={(v) => setFilter(v as StudyFilter)}>
             <SelectTrigger className="w-56" size="sm">
@@ -1124,8 +1128,28 @@ export function RobPage() {
         </div>
       </div>
 
-      {/* Empty state */}
-      {studies.length === 0 ? (
+      {review.type === "DTA" && (
+        <>
+          <Quadas3WorkspacePanel />
+          <div className="flex flex-col gap-2 border-y bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-xs font-semibold">QUADAS-2 legacy assessments</h3>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Open only when an older protocol explicitly requires QUADAS-2. Existing records are preserved and are not converted.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setLegacyOpen((open) => !open)}>
+              {legacyOpen ? "Hide legacy tool" : "Open legacy tool"}
+              {assessments.length > 0 && (
+                <span className="rounded-full bg-muted px-1.5 font-mono text-[9px]">{assessments.length}</span>
+              )}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {/* Study-level tools and preserved QUADAS-2 legacy records */}
+      {(review.type !== "DTA" || legacyOpen) && (studies.length === 0 ? (
         <Card className="p-10 text-center border-dashed bg-muted/20">
           <div className="mx-auto max-w-md space-y-3">
             <div className="mx-auto size-12 rounded-full bg-teal-100 dark:bg-teal-950 flex items-center justify-center">
@@ -1134,7 +1158,7 @@ export function RobPage() {
             <h3 className="text-lg font-semibold">No studies yet</h3>
             <p className="text-sm text-muted-foreground">
               Add studies first from the Studies tab, then assess their risk of
-              bias using RoB 2, ROBINS-I or QUADAS-2.
+              bias using RoB 2, ROBINS-I, or the selected legacy tool.
             </p>
           </div>
         </Card>
@@ -1172,7 +1196,7 @@ export function RobPage() {
             </div>
           )}
         </>
-      )}
+      ))}
 
       {/* Editor dialog */}
       <RobEditorDialog state={editorState} onClose={() => setEditorState(null)} />

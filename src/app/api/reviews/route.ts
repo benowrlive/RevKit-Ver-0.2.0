@@ -55,6 +55,10 @@ export async function loadReviewTree(reviewRow: ReviewRow): Promise<Review> {
     where: { reviewId: reviewRow.id },
   });
 
+  const quadas3Workspace = await db.quadas3Workspace.findUnique({
+    where: { reviewId: reviewRow.id },
+  });
+
   const review: Review = {
     id: reviewRow.id,
     title: reviewRow.title,
@@ -146,6 +150,9 @@ export async function loadReviewTree(reviewRow: ReviewRow): Promise<Review> {
         updatedAt: a.updatedAt,
       }))
     ),
+    quadas3: quadas3Workspace
+      ? (JSON.parse(quadas3Workspace.payload) as NonNullable<Review["quadas3"]>)
+      : null,
     prismaFlow: prismaFlow
       ? {
           reviewId: prismaFlow.reviewId,
@@ -258,6 +265,7 @@ export async function PUT(req: NextRequest) {
       db.reference.deleteMany({ where: { reviewId: id } }),
       db.prismaFlow.deleteMany({ where: { reviewId: id } }),
       db.robAssessment.deleteMany({ where: { reviewId: id } }),
+      db.quadas3Workspace.deleteMany({ where: { reviewId: id } }),
     ]);
 
     await persistReviewTree(review);
@@ -364,7 +372,18 @@ async function persistReviewTree(review: Review) {
     });
   }
 
-  // 5) References.
+  // 5) QUADAS-3 workspace (versioned JSON containing all six phases).
+  if (review.quadas3) {
+    await db.quadas3Workspace.create({
+      data: {
+        reviewId: review.id,
+        payload: JSON.stringify(review.quadas3),
+        updatedAt: review.quadas3.updatedAt,
+      },
+    });
+  }
+
+  // 6) References.
   for (const r of review.references) {
     await db.reference.create({
       data: {
@@ -384,7 +403,7 @@ async function persistReviewTree(review: Review) {
     });
   }
 
-  // 6) PRISMA flow.
+  // 7) PRISMA flow.
   if (review.prismaFlow) {
     await db.prismaFlow.create({
       data: {

@@ -26,6 +26,7 @@ import {
 } from "@/lib/rob/config";
 import { riskDifference } from "@/lib/stats/effect";
 import { calculateDta } from "@/lib/dta/calculate";
+import { quadas3OverallJudgement } from "@/lib/quadas3/config";
 
 // ─── Tiny test harness ───────────────────────────────────────────────────────
 
@@ -290,6 +291,23 @@ function testDorFiniteWhenAllNonZero(): void {
   );
 }
 
+// ─── QUADAS-3: official overall-judgment rules ──────────────────────────────
+
+function testQuadas3OverallJudgements(): void {
+  assert(
+    quadas3OverallJudgement(["low", "low", "low", "low"]) === "low",
+    "QUADAS-3: all domains low produces an overall low judgment",
+  );
+  assert(
+    quadas3OverallJudgement(["low", "high", "low", "low"]) === "high",
+    "QUADAS-3: any high domain produces an overall high judgment",
+  );
+  assert(
+    quadas3OverallJudgement(["low", "insufficient_information", "low"]) === "insufficient_information",
+    "QUADAS-3: insufficient information is retained when no domain is high",
+  );
+}
+
 // ─── Run all tests ────────────────────────────────────────────────────────────
 
 function main(): void {
@@ -323,6 +341,9 @@ function main(): void {
   console.log("\nRB-5: DOR NaN when fp=0 or fn=0 (2 assertions)");
   testDorNanWhenFpZero();
   testDorFiniteWhenAllNonZero();
+
+  console.log("\nQUADAS-3: overall judgment rules (3 assertions)");
+  testQuadas3OverallJudgements();
 
   console.log("\n================================================");
   console.log(`Result: ${passed} passed, ${failed} failed`);

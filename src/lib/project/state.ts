@@ -13,6 +13,7 @@ import type {
   Study,
   Reference,
   RobAssessment,
+  Quadas3Workspace,
   Review,
   ReviewPhase,
   ReviewType,
@@ -75,6 +76,7 @@ interface ReviewState {
   // RoB
   upsertRobAssessment: (a: Omit<RobAssessment, "id" | "createdAt" | "updatedAt"> & { id?: string }) => string;
   deleteRobAssessment: (id: string) => void;
+  setQuadas3Workspace: (workspace: Quadas3Workspace) => void;
 
   // PRISMA flow
   setPrismaBox: (boxId: string, count: number, autoCount?: boolean) => void;
@@ -106,6 +108,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       studies: [],
       references: [],
       robAssessments: [],
+      quadas3: null,
       prismaFlow: null,
     };
     set({ review, isDirty: true, dbId: null });
@@ -445,6 +448,27 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
           ...s.review,
           studies: s.review.studies.filter((st) => st.id !== studyId),
           robAssessments: s.review.robAssessments.filter((a) => a.studyId !== studyId),
+          quadas3: s.review.quadas3
+            ? (() => {
+                const removedEstimateIds = new Set(
+                  s.review.quadas3.estimates
+                    .filter((estimate) => estimate.studyId === studyId)
+                    .map((estimate) => estimate.id),
+                );
+                return {
+                  ...s.review.quadas3,
+                  studyFlows: s.review.quadas3.studyFlows.filter((flow) => flow.studyId !== studyId),
+                  estimates: s.review.quadas3.estimates.filter((estimate) => estimate.studyId !== studyId),
+                  domainAssessments: s.review.quadas3.domainAssessments.filter(
+                    (assessment) => !removedEstimateIds.has(assessment.estimateId),
+                  ),
+                  overallJudgements: s.review.quadas3.overallJudgements.filter(
+                    (judgement) => !removedEstimateIds.has(judgement.estimateId),
+                  ),
+                  updatedAt: new Date().toISOString(),
+                };
+              })()
+            : null,
           // Note: data points become orphaned in the outcome tree; clean them up:
           comparisons: s.review.comparisons.map((c) => ({
             ...c,
@@ -578,6 +602,16 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
           robAssessments: s.review.robAssessments.filter((a) => a.id !== id),
           updatedAt: new Date().toISOString(),
         },
+        isDirty: true,
+      };
+    }),
+
+  setQuadas3Workspace: (workspace) =>
+    set((s) => {
+      if (!s.review) return s;
+      const now = new Date().toISOString();
+      return {
+        review: { ...s.review, quadas3: workspace, updatedAt: now },
         isDirty: true,
       };
     }),
