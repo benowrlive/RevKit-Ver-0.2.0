@@ -1,0 +1,28 @@
+Subject: Request for expert review of RevKit v0.2.0
+
+Dear Dr [Reviewer surname],
+
+I would be grateful for your feedback on RevKit v0.2.0, a browser-based workspace for systematic reviews, meta-analysis, diagnostic test accuracy reviews, risk-of-bias assessment, full-text reading, PRISMA flow management, protocol preparation, and export.
+
+Access: [RevKit link]
+Suggested starting point: Open the dashboard, choose an example review closest to your work, then try adding one study by PDF, DOI, or pasted link.
+
+The areas where your feedback would be most valuable are:
+
+1. Whether the dashboard, review tabs, and terminology are clear to a reviewer using RevKit for the first time.
+2. Whether Smart Add Study is useful and safe: PDF/DOI/link parsing should reduce manual typing, but the reviewer should still feel in control of every field.
+3. Whether the in-app PDF reader makes full-text reading, notes, and study extraction easier without forcing tab switching.
+4. Whether QUADAS-3 v1.2 is presented appropriately for diagnostic test accuracy reviews, and whether keeping QUADAS-2 as a legacy option is sensible.
+5. Whether the PICO/PIRD helpers and PROSPERO preparation draft would help a team prepare a registration, especially for DTA questions with separate populations and reference standards.
+6. Whether the statistical options, plots, PRISMA workflow, exports, and local data-storage assumptions are acceptable for real review work.
+
+Please treat the bundled example datasets as illustrative rather than clinical evidence. RevKit currently has no user authentication, real-time multi-user editing, or cloud PDF sync. PDFs are stored in the browser on the device where they were attached, and all parsed study details should be checked by the reviewer.
+
+I have attached the updated RevKit v0.2.0 Feature and Use Guide as a PDF. Written comments, annotated screenshots, or a short call would all be very helpful.
+
+Thank you for reviewing it.
+
+Best regards,
+[Your name]
+[Role / institution]
+[Email]
