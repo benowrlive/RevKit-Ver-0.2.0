@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -230,10 +229,12 @@ export function WelcomeScreen({ onNew, onOpen, onLoadExample, refreshKey }: Prop
 
               <div className="library-content">
                 {loading ? (
-                  <div className="grid gap-2">
-                    {[0, 1, 2, 3].map((item) => (
-                      <Skeleton key={item} className="h-[74px] rounded-md" />
-                    ))}
+                  <div className="library-empty library-empty--loading enter-pop" role="status" aria-live="polite">
+                    <span className="empty-icon">
+                      <FolderOpen size={26} weight="duotone" />
+                    </span>
+                    <h3>Checking saved reviews</h3>
+                    <p>This will only take a moment.</p>
                   </div>
                 ) : reviews.length > 0 ? (
                   <div className="review-list enter-pop">
